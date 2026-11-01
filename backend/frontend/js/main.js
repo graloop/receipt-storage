@@ -7,7 +7,7 @@ import { go, setRouteHandler } from "./core/router.js";
 import { getCurrentProfile, loadProfiles } from "./core/session.js";
 import { showStatus, showView } from "./core/ui.js";
 import { openDetail } from "./views/detail.js";
-import { loadList } from "./views/list.js";
+import { loadList, readAddress } from "./views/list.js";
 import "./views/profiles.js";
 import "./views/settings.js";
 import "./views/upload.js";
@@ -25,6 +25,8 @@ function handleRoute() {
     openDetail(match[1]);
   } else {
     showView("list-view");
+    document.title = "Receipt Vault";
+    readAddress();
     loadList();
   }
 }

@@ -62,6 +62,7 @@ class ReceiptOut(BaseModel):
     source: Source
     merchant: str | None
     purchased_at: date | None
+    added_on: date
     total: float | None
     currency: str
     category: Category

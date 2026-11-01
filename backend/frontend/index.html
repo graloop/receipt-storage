@@ -110,6 +110,7 @@
       </form>
 
       <p id="list-status" class="status" aria-live="polite"></p>
+      <button id="search-everyone" type="button" class="btn-link hidden">Search everyone's receipts</button>
       <ul id="receipt-list" class="receipt-list"></ul>
     </section>
 
@@ -125,6 +126,7 @@
         </div>
         <form id="detail-form" class="panel detail-form">
           <p id="detail-review" class="review-note hidden">Please check these fields: the reading wasn't sure. Saving marks the receipt as checked.</p>
+          <button id="detail-read" type="button" class="btn-ghost hidden">Read this receipt again</button>
           <label for="field-merchant">Merchant</label>
           <input id="field-merchant" type="text" maxlength="200" />
           <div class="field-pair">

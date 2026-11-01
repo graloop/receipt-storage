@@ -37,6 +37,8 @@ export const FR = {
   Items: "Articles",
   "+ Add an item": "+ Ajouter un article",
   "Text read from the receipt": "Texte lu sur le reçu",
+  "Search everyone's receipts": "Chercher dans les reçus de tout le monde",
+  "Read this receipt again": "Relire ce reçu",
   Save: "Enregistrer",
   Delete: "Supprimer",
 
@@ -73,6 +75,8 @@ export const FR = {
   "No date": "Sans date",
   "No total": "Sans total",
   "To review": "À vérifier",
+  "Added {date}": "Ajouté le {date}",
+  "Saved, but not read yet. {reason}": "Enregistré, mais pas encore lu. {reason}",
   "Waiting...": "En attente...",
   "Reading the receipt...": "Lecture du reçu...",
   "Added: {summary}": "Ajouté : {summary}",
@@ -94,6 +98,7 @@ export const FR = {
   // Messages from the server
   "Profile not found.": "Profil introuvable.",
   "Receipt not found.": "Reçu introuvable.",
+  "This receipt was already read.": "Ce reçu a déjà été lu.",
   "This name is already used by another profile.": "Ce nom est déjà utilisé par un autre profil.",
   "This profile still has receipts.": "Ce profil a encore des reçus.",
   "This file is empty.": "Ce fichier est vide.",
