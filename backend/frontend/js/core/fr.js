@@ -1,0 +1,116 @@
+// The French words, looked up by their English text (see i18n.js).
+// backend/tests/test_frontend.py fails when a string has no French here.
+
+export const FR = {
+  // index.html
+  "Switch profile": "Changer de profil",
+  Settings: "Réglages",
+  Language: "Langue",
+  Profiles: "Profils",
+  "New profile's name": "Nom du nouveau profil",
+  "Add profile": "Ajouter un profil",
+  "Who's this?": "Qui êtes-vous?",
+  "Your name": "Votre nom",
+  Add: "Ajouter",
+  "Take photo": "Prendre une photo",
+  Upload: "Téléverser",
+  "Search merchant, item, text...": "Commerçant, article, texte...",
+  "Search receipts": "Chercher dans les reçus",
+  Filters: "Filtres",
+  "Whose receipts": "Reçus de qui",
+  Mine: "Les miens",
+  Everyone: "Tout le monde",
+  Merchant: "Commerçant",
+  Category: "Catégorie",
+  From: "Du",
+  To: "Au",
+  "Clear filters": "Effacer les filtres",
+  "← Back to the list": "← Retour à la liste",
+  "Open the original": "Ouvrir l'original",
+  "This receipt has no file.": "Ce reçu n'a pas de fichier.",
+  "Please check these fields: the reading wasn't sure. Saving marks the receipt as checked.":
+    "Vérifiez ces champs : la lecture n'était pas certaine. Enregistrer marque le reçu comme vérifié.",
+  Date: "Date",
+  Total: "Total",
+  Currency: "Devise",
+  Profile: "Profil",
+  Items: "Articles",
+  "+ Add an item": "+ Ajouter un article",
+  "Text read from the receipt": "Texte lu sur le reçu",
+  Save: "Enregistrer",
+  Delete: "Supprimer",
+
+  // Categories
+  "All categories": "Toutes",
+  Groceries: "Épicerie",
+  Restaurant: "Restaurant",
+  Household: "Maison",
+  Electronics: "Électronique",
+  Clothing: "Vêtements",
+  Health: "Santé",
+  Transport: "Transport",
+  Entertainment: "Divertissement",
+  Services: "Services",
+  Other: "Autre",
+
+  // Scripts
+  "No profiles yet. Add the first one.": "Aucun profil pour l'instant. Ajoutez le premier.",
+  "Remove this profile": "Retirer ce profil",
+  "Rename this profile": "Renommer ce profil",
+  "{name}: rename": "{name} : renommer",
+  'Remove the profile "{name}"?': "Retirer le profil « {name} »?",
+  'Remove the profile "{name}" and its receipt? This can\'t be undone.':
+    "Retirer le profil « {name} » et son reçu? C'est irréversible.",
+  'Remove the profile "{name}" and its {n} receipts? This can\'t be undone.':
+    "Retirer le profil « {name} » et ses {n} reçus? C'est irréversible.",
+  "{n} receipt": "{n} reçu",
+  "{n} receipts": "{n} reçus",
+  "No receipts yet. Take a photo or upload a file to start.":
+    "Aucun reçu pour l'instant. Prenez une photo ou téléversez un fichier pour commencer.",
+  "No receipts match this search.": "Aucun reçu ne correspond à cette recherche.",
+  "Loading...": "Chargement...",
+  "Unknown merchant": "Commerçant inconnu",
+  "No date": "Sans date",
+  "No total": "Sans total",
+  "To review": "À vérifier",
+  "Waiting...": "En attente...",
+  "Reading the receipt...": "Lecture du reçu...",
+  "Added: {summary}": "Ajouté : {summary}",
+  "Added, please review: {summary}": "Ajouté, à vérifier : {summary}",
+  "Already saved: {summary}": "Déjà enregistré : {summary}",
+  "Receipt from {merchant}": "Reçu de {merchant}",
+  Saved: "Enregistré",
+  "Item name": "Nom de l'article",
+  Qty: "Qté",
+  Price: "Prix",
+  "Remove this item": "Retirer cet article",
+  "Delete this receipt? This can't be undone.": "Supprimer ce reçu? C'est irréversible.",
+  "Error {status}": "Erreur {status}",
+  "The server didn't answer (error {status}). Try again in a minute.":
+    "Le serveur n'a pas répondu (erreur {status}). Réessayez dans une minute.",
+  "Can't reach the app. Check that it's running.":
+    "Impossible de joindre l'application. Vérifiez qu'elle est en marche.",
+
+  // Messages from the server
+  "Profile not found.": "Profil introuvable.",
+  "Receipt not found.": "Reçu introuvable.",
+  "This name is already used by another profile.": "Ce nom est déjà utilisé par un autre profil.",
+  "This profile still has receipts.": "Ce profil a encore des reçus.",
+  "This file is empty.": "Ce fichier est vide.",
+  "This file is too big (15 MB maximum).": "Ce fichier est trop gros (15 Mo maximum).",
+  "This file isn't an image or a PDF.": "Ce fichier n'est ni une image ni un PDF.",
+  "This image is damaged and can't be read.": "Cette image est endommagée et ne peut pas être lue.",
+  "No API key: put ANTHROPIC_API_KEY in .env and restart the app.":
+    "Pas de clé API : mettez ANTHROPIC_API_KEY dans .env et redémarrez l'application.",
+  "The API key was refused: check ANTHROPIC_API_KEY in .env.":
+    "La clé API a été refusée : vérifiez ANTHROPIC_API_KEY dans .env.",
+  "The API key isn't allowed to use this model.": "La clé API n'a pas accès à ce modèle.",
+  "This model doesn't exist: check RECEIPT_MODEL in .env.":
+    "Ce modèle n'existe pas : vérifiez RECEIPT_MODEL dans .env.",
+  "Too many receipts at once. Try again in a minute.": "Trop de reçus à la fois. Réessayez dans une minute.",
+  "The reading service had a problem. Try again in a minute.":
+    "Le service de lecture a eu un problème. Réessayez dans une minute.",
+  "Couldn't reach the reading service. Check the internet connection.":
+    "Impossible de joindre le service de lecture. Vérifiez la connexion Internet.",
+  "The model couldn't read this file.": "Le modèle n'a pas pu lire ce fichier.",
+};

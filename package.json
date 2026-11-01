@@ -1,0 +1,14 @@
+{
+  "name": "receipt-vault",
+  "private": true,
+  "description": "Receipt Vault: the household's receipts in one place, on the home server.",
+  "scripts": {
+    "start": "bash scripts/dev.sh",
+    "test": "cd backend && .venv/bin/python -m pytest -q",
+    "lint": "cd backend && .venv/bin/ruff check app tests && cd .. && prettier --check \"backend/frontend/js/**/*.js\"",
+    "format": "cd backend && .venv/bin/ruff check --fix app tests && cd .. && prettier --write \"backend/frontend/js/**/*.js\""
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}
