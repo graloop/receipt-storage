@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#022c22" />
+  <title>Receipt Vault</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/profiles.css" />
+  <link rel="stylesheet" href="/css/receipts.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand"><a href="/" id="home-link" class="brand-link"><span class="logo" role="img" aria-label="graloop">gral<svg viewBox="-2 -2 116 60" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M56 28 C66 12 78 4 86 4 C99 4 108 15 108 28 C108 41 99 52 86 52 C78 52 66 44 56 28 C46 12 34 4 26 4 C13 4 4 15 4 28 C4 41 13 52 26 52 C34 52 46 44 56 28 Z"></path></svg>p</span><span>Receipt Vault</span></a></h1>
+    <div class="topbar-actions">
+      <div id="profile-menu" class="menu hidden">
+        <button id="profile-btn" type="button" class="user-badge" aria-haspopup="true" aria-expanded="false" aria-controls="profile-panel">
+          <span id="profile-avatar" class="avatar" aria-hidden="true"></span>
+          <span id="profile-name"></span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <div id="profile-panel" class="menu-panel hidden">
+          <h3>Switch profile</h3>
+          <div id="profile-switch-list" class="profile-switch-list"></div>
+        </div>
+      </div>
+      <div class="menu">
+        <button id="settings-btn" type="button" class="icon-btn" aria-label="Settings" title="Settings" aria-haspopup="true" aria-expanded="false" aria-controls="settings-panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0-.73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+        <div id="settings-panel" class="menu-panel hidden">
+          <h3>Language</h3>
+          <div class="lang-switch">
+            <button type="button" class="btn-ghost" data-lang="en">English</button>
+            <button type="button" class="btn-ghost" data-lang="fr">Français</button>
+          </div>
+          <hr />
+          <h3>Profiles</h3>
+          <ul id="settings-profiles" class="settings-profiles"></ul>
+          <form id="settings-add-profile" class="add-profile-form">
+            <input id="settings-new-name" type="text" maxlength="40" required placeholder="New profile's name" aria-label="New profile's name" />
+            <button type="submit">Add profile</button>
+          </form>
+          <p id="settings-status" class="error hidden"></p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <p id="app-error" class="error hidden"></p>
+
+    <!-- First visit: who is using this phone? -->
+    <section id="profile-view" class="view hidden">
+      <h2 class="who-title">Who's this?</h2>
+      <div id="profile-grid" class="profile-grid"></div>
+      <form id="add-profile" class="add-profile-form who-form">
+        <label for="new-profile-name">Add profile</label>
+        <div class="form-row">
+          <input id="new-profile-name" type="text" maxlength="40" required placeholder="Your name" />
+          <button type="submit">Add</button>
+        </div>
+        <p id="add-profile-status" class="error hidden"></p>
+      </form>
+    </section>
+
+    <!-- The receipts: add, search, list. -->
+    <section id="list-view" class="view hidden">
+      <div class="add-buttons">
+        <input id="camera-input" class="visually-hidden" type="file" accept="image/*" capture="environment" />
+        <label for="camera-input" class="btn-big">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+          <span>Take photo</span>
+        </label>
+        <input id="upload-input" class="visually-hidden" type="file" multiple accept="image/*,application/pdf" />
+        <label for="upload-input" class="btn-big btn-big-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m17 8-5-5-5 5"></path><path d="M12 3v12"></path></svg>
+          <span>Upload</span>
+        </label>
+      </div>
+      <ul id="upload-progress" class="upload-progress hidden"></ul>
+
+      <form id="search-form" class="search-form" role="search">
+        <input id="search-input" type="search" placeholder="Search merchant, item, text..." aria-label="Search receipts" autocomplete="off" />
+        <details class="filters">
+          <summary>Filters</summary>
+          <div class="filter-grid">
+            <label>Whose receipts
+              <select id="filter-scope">
+                <option value="mine">Mine</option>
+                <option value="all">Everyone</option>
+              </select>
+            </label>
+            <label>Merchant
+              <input id="filter-merchant" type="text" autocomplete="off" />
+            </label>
+            <label>Category
+              <select id="filter-category"></select>
+            </label>
+            <label>From
+              <input id="filter-from" type="date" />
+            </label>
+            <label>To
+              <input id="filter-to" type="date" />
+            </label>
+            <button id="filter-clear" type="button" class="btn-ghost">Clear filters</button>
+          </div>
+        </details>
+      </form>
+
+      <p id="list-status" class="status" aria-live="polite"></p>
+      <ul id="receipt-list" class="receipt-list"></ul>
+    </section>
+
+    <!-- One receipt: the original next to its fields. -->
+    <section id="detail-view" class="view hidden">
+      <button id="detail-back" type="button" class="btn-ghost back-btn">← Back to the list</button>
+      <p id="detail-error" class="error hidden"></p>
+      <div id="detail-content" class="detail-grid hidden">
+        <div class="panel detail-original">
+          <div id="detail-file"></div>
+          <a id="detail-file-link" class="hidden" target="_blank" rel="noopener">Open the original</a>
+          <p id="detail-no-file" class="status hidden">This receipt has no file.</p>
+        </div>
+        <form id="detail-form" class="panel detail-form">
+          <p id="detail-review" class="review-note hidden">Please check these fields: the reading wasn't sure. Saving marks the receipt as checked.</p>
+          <label for="field-merchant">Merchant</label>
+          <input id="field-merchant" type="text" maxlength="200" />
+          <div class="field-pair">
+            <div>
+              <label for="field-date">Date</label>
+              <input id="field-date" type="date" />
+            </div>
+            <div>
+              <label for="field-category">Category</label>
+              <select id="field-category"></select>
+            </div>
+          </div>
+          <div class="field-pair">
+            <div>
+              <label for="field-total">Total</label>
+              <input id="field-total" type="number" step="0.01" inputmode="decimal" />
+            </div>
+            <div>
+              <label for="field-currency">Currency</label>
+              <input id="field-currency" type="text" maxlength="3" required autocapitalize="characters" />
+            </div>
+          </div>
+          <label for="field-profile">Profile</label>
+          <select id="field-profile"></select>
+
+          <h3 class="items-title">Items</h3>
+          <div id="field-items" class="items-rows"></div>
+          <button id="add-item" type="button" class="btn-ghost add-item">+ Add an item</button>
+
+          <details class="raw-text">
+            <summary>Text read from the receipt</summary>
+            <textarea id="field-raw-text" rows="8" aria-label="Text read from the receipt"></textarea>
+          </details>
+
+          <p id="detail-status" class="status hidden" aria-live="polite"></p>
+          <div class="detail-actions">
+            <button type="submit">Save</button>
+            <button id="detail-delete" type="button" class="btn-danger">Delete</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
