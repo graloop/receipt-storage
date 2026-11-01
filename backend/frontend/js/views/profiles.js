@@ -34,6 +34,8 @@ function renderBadge() {
   document.getElementById("profile-menu").classList.toggle("hidden", !current);
   if (!current) return;
   document.getElementById("profile-name").textContent = current.name;
+  // On a phone the name is hidden: the button still has to say what it is.
+  document.getElementById("profile-btn").setAttribute("aria-label", `${t("Switch profile")}: ${current.name}`);
   avatarFor(current, document.getElementById("profile-avatar"));
   switchList.replaceChildren(
     ...getProfiles().map((profile) => {

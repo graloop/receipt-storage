@@ -51,6 +51,11 @@ class Receipt(Base):
         return self.profile.name
 
     @property
+    def added_on(self) -> date:
+        """The day it was added, on the server's clock (created_at is stored in UTC)."""
+        return self.created_at.replace(tzinfo=UTC).astimezone().date()
+
+    @property
     def file_type(self) -> str | None:
         """What the page should show: an image, a PDF, or nothing (an email has no file)."""
         if not self.image_path:

@@ -9,7 +9,7 @@ export function setRouteHandler(fn) {
 }
 
 export function go(path) {
-  if (location.pathname !== path) history.pushState({}, "", path);
+  if (location.pathname + location.search !== path) history.pushState({}, "", path);
   handler();
 }
 

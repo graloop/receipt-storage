@@ -2,15 +2,18 @@
 
 import { api, json } from "../core/api.js";
 import { fillCategorySelect } from "../core/categories.js";
+import { formatDate } from "../core/format.js";
 import { t } from "../core/i18n.js";
 import { go } from "../core/router.js";
 import { getProfiles } from "../core/session.js";
 import { el, hideStatus, showStatus, showView } from "../core/ui.js";
+import { listAddress } from "./list.js";
 
 const content = document.getElementById("detail-content");
 const errorLine = document.getElementById("detail-error");
 const status = document.getElementById("detail-status");
 const itemRows = document.getElementById("field-items");
+const readButton = document.getElementById("detail-read");
 const fields = {
   merchant: document.getElementById("field-merchant"),
   purchased_at: document.getElementById("field-date"),
@@ -84,6 +87,9 @@ function fill(receipt) {
   itemRows.replaceChildren();
   receipt.items.forEach(addItemRow);
   document.getElementById("detail-review").classList.toggle("hidden", !receipt.needs_review);
+  readButton.classList.toggle("hidden", Boolean(receipt.raw_text) || !receipt.file_type);
+  // The tab's name: tells apart several open receipts, for a person or for the Claude extension.
+  document.title = `${receipt.merchant || t("Unknown merchant")}, ${formatDate(receipt.purchased_at)} - Receipt Vault`;
 }
 
 export async function openDetail(id) {
@@ -104,7 +110,19 @@ export async function openDetail(id) {
   }
 }
 
-document.getElementById("detail-back").addEventListener("click", () => go("/"));
+document.getElementById("detail-back").addEventListener("click", () => go(listAddress()));
+readButton.addEventListener("click", async () => {
+  showStatus(status, t("Reading the receipt..."));
+  readButton.disabled = true;
+  try {
+    fill(await api(`/api/receipts/${current.id}/read`, { method: "POST" }));
+    hideStatus(status);
+  } catch (err) {
+    showStatus(status, err.message, true);
+  } finally {
+    readButton.disabled = false;
+  }
+});
 document.getElementById("add-item").addEventListener("click", () => addItemRow());
 
 document.getElementById("detail-form").addEventListener("submit", async (e) => {
@@ -137,7 +155,7 @@ document.getElementById("detail-delete").addEventListener("click", async () => {
   if (!confirm(t("Delete this receipt? This can't be undone."))) return;
   try {
     await api(`/api/receipts/${current.id}`, { method: "DELETE" });
-    go("/");
+    go(listAddress());
   } catch (err) {
     showStatus(status, err.message, true);
   }

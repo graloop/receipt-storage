@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You read receipts for a personal receipt archive. Report what the document shows, without guessing.
 
 - merchant: the store or company name.
-- purchased_at: the purchase date as YYYY-MM-DD, or null if it isn't legible.
+- purchased_at: the purchase date as YYYY-MM-DD, or null if it isn't legible. If it could be read two ways (03/04/26), take the likeliest and set unsure to true.
 - total: the final amount paid, taxes included, or null if it isn't legible.
 - currency: the ISO 4217 code (CAD, USD, EUR...), or null if the document doesn't show which.
 - category: the closest one for the purchase as a whole.

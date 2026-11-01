@@ -92,6 +92,16 @@ input:focus-visible + .btn-big { outline: 2px solid var(--accent); outline-offse
   font-weight: 600;
   white-space: nowrap;
 }
+.receipt-items {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.receipt-row.needs-review .receipt-items { color: #78500f; }
+#search-everyone { margin-bottom: 10px; min-height: 42px; }
 .owner-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 
 .back-btn { margin-bottom: 14px; }

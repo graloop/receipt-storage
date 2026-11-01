@@ -52,10 +52,27 @@ def _duplicate(filename: str, existing: Receipt) -> UploadResult:
     return UploadResult(filename=filename, status="duplicate", receipt=ReceiptOut.model_validate(existing))
 
 
+def _read_fields(extracted: extractor.ExtractedReceipt) -> dict:
+    """What the model read, as a receipt's columns."""
+    merchant = (extracted.merchant or "").strip() or None
+    purchased_at = _parse_date(extracted.purchased_at)
+    return {
+        "merchant": merchant,
+        "purchased_at": purchased_at,
+        "total": extracted.total,
+        "currency": _currency(extracted.currency),
+        "category": extracted.category,
+        "items": [item.model_dump() for item in extracted.items],
+        "raw_text": extracted.raw_text,
+        "needs_review": extracted.unsure or merchant is None or purchased_at is None or extracted.total is None,
+    }
+
+
 def _add_file(db: Session, upload: UploadFile, profile_id: int, requested_source: str | None) -> UploadResult:
     filename = upload.filename or "file"
     # One byte over the limit is enough to know it's too big.
     data = upload.file.read(storage.MAX_UPLOAD_BYTES + 1)
+    message = None
     try:
         checked = storage.check_file(data)
         sha256 = hashlib.sha256(data).hexdigest()
@@ -63,26 +80,22 @@ def _add_file(db: Session, upload: UploadFile, profile_id: int, requested_source
         existing = db.scalar(select(Receipt).where(Receipt.file_sha256 == sha256))
         if existing is not None:
             return _duplicate(filename, existing)
-        extracted = extractor.read_receipt(data, checked.kind)
-    except (storage.FileRejected, extractor.ExtractionError) as err:
+        try:
+            fields = _read_fields(extractor.read_receipt(data, checked.kind))
+        except extractor.ExtractionError as err:
+            # The paper may be in the trash already: keep the receipt, unread, whatever went wrong.
+            fields = {"needs_review": True}
+            message = str(err)
+    except storage.FileRejected as err:
         return UploadResult(filename=filename, status="error", message=str(err))
 
-    merchant = (extracted.merchant or "").strip() or None
-    purchased_at = _parse_date(extracted.purchased_at)
     stored_name = storage.save_file(data, checked.extension)
     receipt = Receipt(
         profile_id=profile_id,
         source=_source(checked.kind, requested_source),
-        merchant=merchant,
-        purchased_at=purchased_at,
-        total=extracted.total,
-        currency=_currency(extracted.currency),
-        category=extracted.category,
-        items=[item.model_dump() for item in extracted.items],
-        raw_text=extracted.raw_text,
         image_path=stored_name,
         file_sha256=sha256,
-        needs_review=extracted.unsure or merchant is None or purchased_at is None or extracted.total is None,
+        **fields,
     )
     db.add(receipt)
     try:
@@ -92,7 +105,7 @@ def _add_file(db: Session, upload: UploadFile, profile_id: int, requested_source
         db.rollback()
         storage.delete_file(stored_name)
         return _duplicate(filename, db.scalar(select(Receipt).where(Receipt.file_sha256 == sha256)))
-    return UploadResult(filename=filename, status="added", receipt=ReceiptOut.model_validate(receipt))
+    return UploadResult(filename=filename, status="added", message=message, receipt=ReceiptOut.model_validate(receipt))
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -123,6 +136,8 @@ def search_receipts(
     db: Session = Depends(get_db),
 ):
     query = select(Receipt)
+    # A receipt with no date counts as dated the day it was added, so everything has a place in the order.
+    sort_date = func.coalesce(Receipt.purchased_at, func.date(Receipt.created_at, "localtime"))
     # Every word has to appear somewhere: "amazon headphones" matches the merchant and an item.
     searchable = (
         func.coalesce(Receipt.merchant, "")
@@ -140,11 +155,10 @@ def search_receipts(
     if category is not None:
         query = query.where(Receipt.category == category)
     if from_date is not None:
-        query = query.where(Receipt.purchased_at >= from_date)
+        query = query.where(sort_date >= from_date.isoformat())
     if to_date is not None:
-        query = query.where(Receipt.purchased_at <= to_date)
-    # A receipt with no date comes first: it needs someone to look at it.
-    query = query.order_by(Receipt.purchased_at.desc().nulls_first(), Receipt.id.desc())
+        query = query.where(sort_date <= to_date.isoformat())
+    query = query.order_by(sort_date.desc(), Receipt.id.desc())
     return list(db.scalars(query).unique())
 
 
@@ -164,6 +178,27 @@ def update_receipt(receipt_id: int, body: ReceiptUpdate, db: Session = Depends(g
     if "profile_id" in changes:
         _require_profile(db, changes["profile_id"])
     for field, value in changes.items():
+        setattr(receipt, field, value)
+    db.commit()
+    db.refresh(receipt)
+    return receipt
+
+
+@router.post("/{receipt_id}/read", response_model=ReceiptOut)
+def read_again(receipt_id: int, db: Session = Depends(get_db)):
+    """For a receipt saved unread. One already read is refused, so corrections can't be overwritten."""
+    receipt = _get_or_404(db, receipt_id)
+    if not receipt.image_path:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This receipt has no file.")
+    if receipt.raw_text:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This receipt was already read.")
+    with open(storage.file_path(receipt.image_path), "rb") as f:
+        data = f.read()
+    try:
+        fields = _read_fields(extractor.read_receipt(data, receipt.file_type))
+    except (storage.FileRejected, extractor.ExtractionError) as err:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from None
+    for field, value in fields.items():
         setattr(receipt, field, value)
     db.commit()
     db.refresh(receipt)

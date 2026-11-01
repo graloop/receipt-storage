@@ -1,5 +1,6 @@
 import io
 import pathlib
+from datetime import date, timedelta
 
 import pillow_heif
 from PIL import Image
@@ -146,13 +147,42 @@ def test_file_of_exactly_15_mb_is_accepted(client, profile):
     assert upload(client, profile["id"], ("limit.pdf", limit))[0]["status"] == "added"
 
 
-def test_reading_failure_keeps_nothing_and_says_why(client, profile, reader):
+def test_reading_failure_still_keeps_the_receipt_and_says_why(client, profile, reader):
     reader.next_answer = extractor.ExtractionError("Too many receipts at once. Try again in a minute.")
-    result = upload(client, profile["id"], ("a.png", png()))[0]
-    assert result["status"] == "error"
+    result = upload(client, profile["id"], ("a.png", png()), source="photo")[0]
+    assert result["status"] == "added"
     assert result["message"] == "Too many receipts at once. Try again in a minute."
-    assert uploaded_files() == []
-    assert client.get("/api/receipts").json() == []
+    receipt = result["receipt"]
+    assert receipt["needs_review"] is True
+    assert receipt["raw_text"] is None
+    assert receipt["source"] == "photo"
+    assert receipt["category"] == "other"
+    assert len(uploaded_files()) == 1
+    assert client.get(f"/api/receipts/{receipt['id']}/image").content == png()
+    assert [r["id"] for r in client.get("/api/receipts").json()] == [receipt["id"]]
+
+
+def test_a_receipt_saved_unread_can_be_read_again(client, profile, reader):
+    reader.next_answer = extractor.ExtractionError("Too many receipts at once. Try again in a minute.")
+    receipt = upload(client, profile["id"], ("a.png", png()))[0]["receipt"]
+    url = f"/api/receipts/{receipt['id']}/read"
+
+    response = client.post(url)
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Too many receipts at once. Try again in a minute."
+
+    reader.next_answer = make_extracted()
+    read = client.post(url).json()
+    assert read["merchant"] == "Épicerie du Coin"
+    assert read["needs_review"] is False
+    assert read["id"] == receipt["id"]
+
+
+def test_reading_again_cannot_overwrite_a_receipt_already_read(client, profile):
+    receipt = upload(client, profile["id"], ("a.png", png()))[0]["receipt"]
+    client.patch(f"/api/receipts/{receipt['id']}", json={"merchant": "Corrected by hand"})
+    assert client.post(f"/api/receipts/{receipt['id']}/read").status_code == 409
+    assert client.get(f"/api/receipts/{receipt['id']}").json()["merchant"] == "Corrected by hand"
 
 
 # --- Search ---
@@ -168,11 +198,37 @@ def merchants(response) -> list[str]:
     return [r["merchant"] for r in response.json()]
 
 
-def test_newest_first_and_no_date_on_top(client, profile):
-    add(client, profile["id"], 1, merchant="Old", purchased_at="2025-01-01")
-    add(client, profile["id"], 2, merchant="New", purchased_at="2026-06-01")
-    add(client, profile["id"], 3, merchant="Undated", purchased_at=None)
-    assert merchants(client.get("/api/receipts")) == ["Undated", "New", "Old"]
+def test_everything_is_in_date_order_newest_first(client, profile):
+    add(client, profile["id"], 1, merchant="Middle", purchased_at="2025-06-15")
+    add(client, profile["id"], 2, merchant="Oldest", purchased_at="2019-01-01")
+    add(client, profile["id"], 3, merchant="Newest", purchased_at="2026-02-01")
+    assert merchants(client.get("/api/receipts")) == ["Newest", "Middle", "Oldest"]
+
+
+def test_order_follows_the_purchase_date_not_the_day_added_after_a_correction(client, profile):
+    first = add(client, profile["id"], 1, merchant="A", purchased_at="2026-01-01")
+    add(client, profile["id"], 2, merchant="B", purchased_at="2025-01-01")
+    client.patch(f"/api/receipts/{first['id']}", json={"purchased_at": "2024-01-01"})
+    assert merchants(client.get("/api/receipts")) == ["B", "A"]
+
+
+def test_no_date_takes_its_place_by_the_day_it_was_added(client, profile):
+    today = date.today()
+    future = (today + timedelta(days=30)).isoformat()
+    past = (today - timedelta(days=30)).isoformat()
+    add(client, profile["id"], 1, merchant="Past", purchased_at=past)
+    add(client, profile["id"], 2, merchant="Undated", purchased_at=None)
+    add(client, profile["id"], 3, merchant="Future", purchased_at=future)
+    assert merchants(client.get("/api/receipts")) == ["Future", "Undated", "Past"]
+    assert client.get("/api/receipts").json()[1]["added_on"] == today.isoformat()
+
+
+def test_date_filters_include_a_receipt_with_no_date_by_the_day_added(client, profile):
+    today = date.today()
+    add(client, profile["id"], 1, merchant="Undated", purchased_at=None)
+    assert merchants(client.get("/api/receipts", params={"from": today.isoformat()})) == ["Undated"]
+    tomorrow = (today + timedelta(days=1)).isoformat()
+    assert merchants(client.get("/api/receipts", params={"from": tomorrow})) == []
 
 
 def test_search_every_word_must_match_anywhere(client, profile):

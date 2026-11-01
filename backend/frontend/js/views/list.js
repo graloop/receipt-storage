@@ -10,6 +10,7 @@ import { el, showStatus } from "../core/ui.js";
 
 const list = document.getElementById("receipt-list");
 const status = document.getElementById("list-status");
+const everyone = document.getElementById("search-everyone");
 const fields = {
   q: document.getElementById("search-input"),
   scope: document.getElementById("filter-scope"),
@@ -21,22 +22,58 @@ const fields = {
 
 fillCategorySelect(fields.category, t("All categories"));
 
-function searchParams() {
+const FILTERS = ["q", "merchant", "category", "from", "to"];
+
+function filterParams() {
   const params = new URLSearchParams();
-  for (const key of ["q", "merchant", "category", "from", "to"]) {
+  for (const key of FILTERS) {
     if (fields[key].value.trim()) params.set(key, fields[key].value.trim());
   }
+  return params;
+}
+
+function searchParams() {
+  const params = filterParams();
   if (fields.scope.value === "mine") params.set("profile_id", getCurrentProfile().id);
   return params;
 }
 
+// The address that reopens this search: /?q=headphones&scope=all
+export function listAddress() {
+  const params = filterParams();
+  if (fields.scope.value === "all") params.set("scope", "all");
+  const query = params.toString();
+  return query ? `/?${query}` : "/";
+}
+
+// The other way around: an address opens its search, so a search can be linked to or reopened with Back.
+export function readAddress() {
+  const params = new URLSearchParams(location.search);
+  for (const key of FILTERS) fields[key].value = params.get(key) ?? "";
+  fields.scope.value = params.get("scope") === "all" ? "all" : "mine";
+  if (FILTERS.some((key) => key !== "q" && params.get(key)) || params.get("scope") === "all") {
+    document.querySelector(".filters").open = true;
+  }
+}
+
 function isFiltered() {
-  return ["q", "merchant", "category", "from", "to"].some((key) => fields[key].value.trim());
+  return FILTERS.some((key) => fields[key].value.trim());
+}
+
+function dateLabel(receipt) {
+  return receipt.purchased_at
+    ? formatDate(receipt.purchased_at)
+    : t("Added {date}", { date: formatDate(receipt.added_on) });
+}
+
+function itemsPreview(receipt) {
+  const names = receipt.items.map((item) => item.name);
+  return names.slice(0, 3).join(", ") + (names.length > 3 ? "..." : "");
 }
 
 function row(receipt) {
   const owner = getProfiles().find((p) => p.id === receipt.profile_id);
-  const meta = el("span", { class: "receipt-meta" }, formatDate(receipt.purchased_at));
+  const meta = el("span", { class: "receipt-meta" }, dateLabel(receipt));
   meta.append(" · ", categoryLabel(receipt.category));
   if (fields.scope.value === "all") {
     const dot = el("span", { class: "owner-dot", "aria-hidden": "true" });
@@ -51,6 +88,7 @@ function row(receipt) {
     meta,
   );
   if (receipt.needs_review) link.append(el("span", { class: "review-badge" }, t("To review")));
+  if (receipt.items.length) link.append(el("span", { class: "receipt-items" }, itemsPreview(receipt)));
   link.addEventListener("click", (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey) return; // Let "open in a new tab" work.
     e.preventDefault();
@@ -63,6 +101,9 @@ let latest = 0; // A slow, older search must not overwrite a newer one's results
 
 export async function loadList() {
   const request = ++latest;
+  // On this screen only: an upload finishing after a tap on a receipt mustn't change that address.
+  if (location.pathname === "/") history.replaceState({}, "", listAddress());
+  everyone.classList.add("hidden");
   if (!list.children.length) showStatus(status, t("Loading..."));
   try {
     const receipts = await api(`/api/receipts?${searchParams()}`);
@@ -70,8 +111,10 @@ export async function loadList() {
     list.replaceChildren(...receipts.map(row));
     const n = receipts.length;
     if (n) showStatus(status, isSingular(n) ? t("{n} receipt", { n }) : t("{n} receipts", { n }));
-    else if (isFiltered()) showStatus(status, t("No receipts match this search."));
-    else showStatus(status, t("No receipts yet. Take a photo or upload a file to start."));
+    else if (isFiltered()) {
+      showStatus(status, t("No receipts match this search."));
+      everyone.classList.toggle("hidden", fields.scope.value === "all");
+    } else showStatus(status, t("No receipts yet. Take a photo or upload a file to start."));
   } catch (err) {
     if (request === latest) showStatus(status, err.message, true);
   }
@@ -91,6 +134,11 @@ document.getElementById("search-form").addEventListener("submit", (e) => {
 fields.q.addEventListener("input", loadSoon);
 fields.merchant.addEventListener("input", loadSoon);
 for (const key of ["scope", "category", "from", "to"]) fields[key].addEventListener("change", loadList);
+everyone.addEventListener("click", () => {
+  fields.scope.value = "all";
+  document.querySelector(".filters").open = true;
+  loadList();
+});
 document.getElementById("filter-clear").addEventListener("click", () => {
   for (const key of ["merchant", "category", "from", "to"]) fields[key].value = "";
   fields.scope.value = "mine";
