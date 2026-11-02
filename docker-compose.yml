@@ -1,0 +1,30 @@
+# Receipt Vault on the home server, as a Portainer stack. Everything worth
+# keeping is in the receipts_data volume: updating the app doesn't touch it.
+services:
+  app:
+    # Built by GitHub Actions (.github/workflows/ci.yml) on every push to main
+    # and published to GitHub's registry, so Portainer only has to pull it
+    # (Portainer can't build images through a Portainer Agent). Tags: latest and
+    # sha-<short commit>; set TAG=sha-xxxxxxx in the stack to go back to an
+    # earlier version.
+    image: ghcr.io/graloop/receipt-storage:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      # The mailbox made only for forwarded receipts (see README). Leave both
+      # empty and the app simply doesn't check any mail.
+      RECEIPTS_IMAP_USER: ${RECEIPTS_IMAP_USER:-}
+      RECEIPTS_IMAP_PASSWORD: ${RECEIPTS_IMAP_PASSWORD:-}
+      # Optional. Empty: receipts wait to be read by the Claude extension in Chrome.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RECEIPT_MODEL: ${RECEIPT_MODEL:-claude-haiku-5-5}
+      # The server's clock: the day a receipt was added, and when the mail is checked.
+      TZ: ${TZ:-America/Toronto}
+    ports:
+      - "8020:8000"
+    volumes:
+      - receipts_data:/data
+
+volumes:
+  receipts_data:
+    # A fixed name: the receipts stay the same volume even if the stack is renamed.
+    name: receipts_data

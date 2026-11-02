@@ -5,13 +5,15 @@ import pathlib
 import re
 from html.parser import HTMLParser
 
+from app.version import VERSION
+
 ROOT = pathlib.Path(__file__).parent.parent
 FRONTEND = ROOT / "frontend"
 FR_SOURCE = (FRONTEND / "js/core/fr.js").read_text(encoding="utf-8")
 JS_FILES = [p for p in (FRONTEND / "js").rglob("*.js") if p.name != "fr.js"]
 JS_SOURCE = "\n".join(p.read_text(encoding="utf-8") for p in JS_FILES)
 # Same in both languages, or not language at all.
-NOT_TRANSLATED = {"Receipt Vault", "graloop", "gral", "p", "×", "English", "Français"}
+NOT_TRANSLATED = {"Receipt Vault", "graloop", "gral", "p", "×", "English", "Français", "Receipt Vault v__APP_VERSION__"}
 
 
 def french_has(text: str) -> bool:
@@ -61,7 +63,8 @@ def test_every_script_string_has_french():
 
 def test_every_server_message_has_french():
     source = "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "app").rglob("*.py"))
-    messages = re.findall(r'(?:ExtractionError|FileRejected)\("([^"]+)"\)', source)
+    messages = re.findall(r'(?:ExtractionError|FileRejected|MailError)\("([^"]+)"\)', source)
+    messages += re.findall(r'"error": "([^"]+)"', source)
     messages += re.findall(r'HTTP_\w+, "([^"]+)"\)', source)
     assert len(messages) > 10
     missing = {m for m in messages if not french_has(m)}
@@ -106,6 +109,10 @@ def test_scripts_never_build_html_from_strings():
 def test_api_docs_are_off_by_default(client):
     assert client.get("/docs").status_code == 404
     assert client.get("/openapi.json").status_code == 404
+
+
+def test_version_shows_in_settings(client):
+    assert f"Receipt Vault v{VERSION}<" in client.get("/").text
 
 
 def test_health(client):

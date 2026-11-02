@@ -73,7 +73,7 @@ French. Categories are stored as English keys and translated for display.
 
 ## Profiles (no passwords)
 The app is used only on the home network, so there are no passwords or logins.
-- A household has a few profiles (table `profiles`: id, name, color, created_at).
+- A household has a few profiles (see "Data model").
 - First visit: a "Who's this?" screen with one big button per profile, plus "Add profile".
   The choice is saved in `localStorage`; the profile badge in the top bar switches profile.
 - Profiles are added, renamed and removed in Settings. Removing a profile that still has
@@ -101,7 +101,9 @@ The app is used only on the home network, so there are no passwords or logins.
 - Before each commit: `ruff check app tests`, `python -m pytest -q`, and prettier on the JS.
 
 ## Data model
-`profiles`: id, name, color, created_at.
+`profiles`: id, name, color, email (nullable, lowercase), created_at.
+
+`app_state`: key, value (JSON): small things to remember, like the last mail check.
 
 `receipts`: id, profile_id, source (photo | screenshot | pdf | email), merchant,
 purchased_at (date), total (number), currency (default CAD), category, items (JSON list of
@@ -117,6 +119,7 @@ transport, entertainment, services, other.
 - `GET /api/profiles`, `POST /api/profiles`, `PATCH /api/profiles/{id}`,
   `DELETE /api/profiles/{id}`
 - `GET /api/config`: `auto_read` says whether an API key is set.
+- `GET /api/mail`, `POST /api/mail/check`: the mailbox's state, and a check right now.
 - `POST /api/receipts/upload`: multipart, `profile_id` and one or more files. Saves the file
   under `uploads/` and the row, unread. With an API key it also reads each one with the model,
   sets `needs_review` when the model is unsure or merchant, date or total is missing, and if the
@@ -154,6 +157,12 @@ transport, entertainment, services, other.
   entry with a GitHub token that has `read:packages`. Explain that step when we get there.
 - `docker-compose.build.yml` builds from the checkout instead, for testing the image locally.
 
+## Making a new version
+Raise `VERSION` in `backend/app/version.py`, push to main, and CI publishes the image once its
+checks pass. Portainer then re-pulls it (steps in README). The receipts stay in the volume. A
+new nullable column is added by itself at startup (`add_missing_columns`); anything else about
+existing data needs its own migration, and never touches `/data` otherwise.
+
 ## Stages
 Do one stage at a time, then stop and show me it working.
 1. **Local version**: project setup, database, profiles, upload with receipt reading, search,
@@ -168,10 +177,10 @@ Do one stage at a time, then stop and show me it working.
 ## Forwarded email (stage 3)
 I forward a receipt email to a Gmail address made only for this, and it appears in the app by
 itself, by the next day at the latest. No Claude session is involved.
-- The app checks that mailbox once a day, no more often, over IMAP, with a Gmail app password
-  (`RECEIPTS_IMAP_USER`, `RECEIPTS_IMAP_PASSWORD`: `.env` locally, the Portainer stack's
+- The app checks that mailbox once a day on its own, no more often, over IMAP, with a Gmail app
+  password (`RECEIPTS_IMAP_USER`, `RECEIPTS_IMAP_PASSWORD`: `.env` locally, the Portainer stack's
   environment variables on the server). The connection goes out from the server; nothing is
-  opened to the internet.
+  opened to the internet. A "Check the mailbox now" button in Settings is there for trying it out.
 - A profile gets an email address. A forward goes to the profile whose address sent it. Mail
   from any other address is ignored, so a stranger can't add receipts.
 - The email's text and any PDF or image attachments are saved and viewable in the detail view,

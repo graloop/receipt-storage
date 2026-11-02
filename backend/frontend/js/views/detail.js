@@ -73,7 +73,10 @@ function showFile(receipt) {
   if (receipt.file_type === "pdf") box.append(el("iframe", { class: "detail-pdf", src: url, title: label }));
   link.classList.toggle("hidden", !receipt.file_type);
   link.href = url;
-  document.getElementById("detail-no-file").classList.toggle("hidden", Boolean(receipt.file_type));
+  const noFile = document.getElementById("detail-no-file");
+  noFile.classList.toggle("hidden", Boolean(receipt.file_type));
+  noFile.textContent =
+    receipt.source === "email" ? t("This receipt came by email. Its text is below.") : t("This receipt has no file.");
 }
 
 function fill(receipt) {
@@ -89,8 +92,17 @@ function fill(receipt) {
   itemRows.replaceChildren();
   receipt.items.forEach(addItemRow);
   document.getElementById("detail-review").classList.toggle("hidden", !receipt.needs_review || receipt.unread);
-  document.getElementById("detail-unread").classList.toggle("hidden", !receipt.unread);
-  readButton.classList.toggle("hidden", !receipt.unread || !receipt.file_type || !canAutoRead());
+  const unreadNote = document.getElementById("detail-unread");
+  unreadNote.classList.toggle("hidden", !receipt.unread);
+  unreadNote.textContent =
+    receipt.source === "email"
+      ? t(
+          'This receipt came by email and hasn\'t been read yet. Its text is under "Text read from the receipt": keep it there, and copy the merchant, date, total and items into the fields.',
+        )
+      : t(
+          'This receipt hasn\'t been read yet. Copy what the original shows into the fields, including all its text under "Text read from the receipt".',
+        );
+  readButton.classList.toggle("hidden", !receipt.unread || !canAutoRead());
   saveNextButton.classList.toggle("hidden", !receipt.unread);
   // Open when the text is what's being asked for: a closed section is easy to miss.
   document.querySelector(".raw-text").open = receipt.unread;

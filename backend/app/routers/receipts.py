@@ -52,7 +52,7 @@ def _duplicate(filename: str, existing: Receipt) -> UploadResult:
     return UploadResult(filename=filename, status="duplicate", receipt=ReceiptOut.model_validate(existing))
 
 
-def _read_fields(extracted: extractor.ExtractedReceipt) -> dict:
+def read_fields(extracted: extractor.ExtractedReceipt) -> dict:
     """What the model read, as a receipt's columns."""
     merchant = (extracted.merchant or "").strip() or None
     purchased_at = _parse_date(extracted.purchased_at)
@@ -83,7 +83,7 @@ def _add_file(db: Session, upload: UploadFile, profile_id: int, requested_source
             return _duplicate(filename, existing)
         if extractor.enabled():
             try:
-                fields = _read_fields(extractor.read_receipt(data, checked.kind))
+                fields = read_fields(extractor.read_receipt(data, checked.kind))
             except extractor.ExtractionError as err:
                 # The paper may be in the trash already: keep the receipt, unread, whatever went wrong.
                 message = str(err)
@@ -192,16 +192,21 @@ def update_receipt(receipt_id: int, body: ReceiptUpdate, db: Session = Depends(g
 def read_again(receipt_id: int, db: Session = Depends(get_db)):
     """With an API key, for a receipt still unread. One already read is refused, so corrections can't be overwritten."""
     receipt = _get_or_404(db, receipt_id)
-    if not receipt.image_path:
+    if not receipt.image_path and not receipt.raw_text:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This receipt has no file.")
     if not receipt.unread:
         raise HTTPException(status.HTTP_409_CONFLICT, "This receipt was already read.")
-    with open(storage.file_path(receipt.image_path), "rb") as f:
-        data = f.read()
+    if receipt.image_path:
+        with open(storage.file_path(receipt.image_path), "rb") as f:
+            data, kind = f.read(), receipt.file_type
+    else:  # A forwarded email with nothing attached: its text is all there is.
+        data, kind = receipt.raw_text.encode(), "text"
     try:
-        fields = _read_fields(extractor.read_receipt(data, receipt.file_type))
+        fields = read_fields(extractor.read_receipt(data, kind))
     except (storage.FileRejected, extractor.ExtractionError) as err:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from None
+    # The email's date stays if the model found none.
+    fields["purchased_at"] = fields["purchased_at"] or receipt.purchased_at
     for field, value in fields.items():
         setattr(receipt, field, value)
     db.commit()

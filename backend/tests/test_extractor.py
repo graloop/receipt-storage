@@ -146,3 +146,8 @@ def test_error_messages_never_contain_the_key(api):
         read_receipt(b"%PDF-", "pdf")
     assert "test-key" not in str(caught.value)
     assert "test-key" not in repr(get_settings())
+
+
+def test_an_email_goes_as_plain_text(api):
+    read_receipt("Café moulu 12,99".encode(), "text")
+    assert api.sent["messages"][0]["content"][0] == {"type": "text", "text": "Café moulu 12,99"}
