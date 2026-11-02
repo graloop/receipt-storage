@@ -70,6 +70,8 @@ class _TextFromHtml(HTMLParser):
             self.skipping += 1
         elif tag in self.BREAKS:
             self.parts.append("\n")
+        elif tag in ("td", "th"):  # Most receipts are tables: keep "Total" apart from "40.03".
+            self.parts.append(" ")
 
     def handle_endtag(self, tag):
         if tag in self.SKIPPED:
