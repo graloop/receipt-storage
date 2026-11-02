@@ -31,6 +31,9 @@ async function uploadOne(file, source, state, row) {
       state.textContent = t("Saved, but not read yet. {reason}", { reason: t(result.message) });
     } else if (result.status === "duplicate") {
       state.textContent = t("Already saved: {summary}", { summary: summary(result.receipt) });
+    } else if (result.receipt.unread) {
+      row.classList.add("added");
+      state.textContent = t("Saved, will be read later");
     } else if (result.receipt.needs_review) {
       row.classList.add("review");
       state.textContent = t("Added, please review: {summary}", { summary: summary(result.receipt) });

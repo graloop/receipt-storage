@@ -2,7 +2,7 @@
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -51,6 +51,11 @@ class Receipt(Base):
         return self.profile.name
 
     @property
+    def unread(self) -> bool:
+        """Waiting to be read. Keep in step with UNREAD below, the same test for a search."""
+        return self.needs_review and self.merchant is None and self.total is None
+
+    @property
     def added_on(self) -> date:
         """The day it was added, on the server's clock (created_at is stored in UTC)."""
         return self.created_at.replace(tzinfo=UTC).astimezone().date()
@@ -61,3 +66,6 @@ class Receipt(Base):
         if not self.image_path:
             return None
         return "pdf" if self.image_path.endswith(".pdf") else "image"
+
+
+UNREAD = and_(Receipt.needs_review.is_(True), Receipt.merchant.is_(None), Receipt.total.is_(None))

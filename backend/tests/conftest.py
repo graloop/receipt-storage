@@ -58,8 +58,10 @@ class FakeReader:
 
 @pytest.fixture(autouse=True)
 def reader(monkeypatch):
+    """Most tests act as if a key were set, with the fake answering. See test_no_key.py for the other way."""
     fake = FakeReader()
     monkeypatch.setattr(extractor, "read_receipt", fake)
+    monkeypatch.setattr(extractor, "enabled", lambda: True)
     return fake
 
 

@@ -70,6 +70,7 @@ class ReceiptOut(BaseModel):
     raw_text: str | None
     file_type: Literal["image", "pdf"] | None
     needs_review: bool
+    unread: bool
 
 
 class ReceiptUpdate(BaseModel):

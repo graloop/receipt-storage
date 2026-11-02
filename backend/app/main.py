@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import extractor
 from .config import get_settings
 from .database import Base, engine
 from .routers import profiles, receipts
@@ -39,6 +40,11 @@ app.include_router(receipts.router)
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/config")
+def config():
+    return {"auto_read": extractor.enabled()}
 
 
 class RevalidatingStaticFiles(StaticFiles):

@@ -4,7 +4,7 @@
 
 import { translatePage } from "./core/i18n.js";
 import { go, setRouteHandler } from "./core/router.js";
-import { getCurrentProfile, loadProfiles } from "./core/session.js";
+import { getCurrentProfile, loadConfig, loadProfiles } from "./core/session.js";
 import { showStatus, showView } from "./core/ui.js";
 import { openDetail } from "./views/detail.js";
 import { loadList, readAddress } from "./views/list.js";
@@ -39,7 +39,7 @@ document.getElementById("home-link").addEventListener("click", (e) => {
 setRouteHandler(handleRoute);
 
 try {
-  await loadProfiles();
+  await Promise.all([loadProfiles(), loadConfig()]);
   handleRoute();
 } catch (err) {
   showStatus(document.getElementById("app-error"), err.message, true);

@@ -6,6 +6,7 @@ import { api } from "./api.js";
 const PROFILE_KEY = "rv_profile";
 
 let profiles = [];
+let autoRead = false;
 const listeners = [];
 
 export function getProfiles() {
@@ -32,6 +33,15 @@ export function setCurrentProfile(id) {
     // Private browsing: the choice lasts until the page is reloaded.
   }
   notify();
+}
+
+// With an API key on the server, a receipt can be read from its page.
+export async function loadConfig() {
+  autoRead = (await api("/api/config")).auto_read;
+}
+
+export function canAutoRead() {
+  return autoRead;
 }
 
 export async function loadProfiles() {

@@ -181,6 +181,7 @@ def test_a_receipt_saved_unread_can_be_read_again(client, profile, reader):
 def test_reading_again_cannot_overwrite_a_receipt_already_read(client, profile):
     receipt = upload(client, profile["id"], ("a.png", png()))[0]["receipt"]
     client.patch(f"/api/receipts/{receipt['id']}", json={"merchant": "Corrected by hand"})
+    # conftest's fake reader would happily answer: the refusal has to come first.
     assert client.post(f"/api/receipts/{receipt['id']}/read").status_code == 409
     assert client.get(f"/api/receipts/{receipt['id']}").json()["merchant"] == "Corrected by hand"
 
