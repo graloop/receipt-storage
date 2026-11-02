@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .. import extractor, storage
 from ..database import fold, get_db
-from ..models import Profile, Receipt
+from ..models import UNREAD, Profile, Receipt
 from ..schemas import Category, ReceiptOut, ReceiptUpdate, UploadResponse, UploadResult
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
@@ -73,6 +73,7 @@ def _add_file(db: Session, upload: UploadFile, profile_id: int, requested_source
     # One byte over the limit is enough to know it's too big.
     data = upload.file.read(storage.MAX_UPLOAD_BYTES + 1)
     message = None
+    fields = {"needs_review": True}  # Unread until something reads it.
     try:
         checked = storage.check_file(data)
         sha256 = hashlib.sha256(data).hexdigest()
@@ -80,12 +81,12 @@ def _add_file(db: Session, upload: UploadFile, profile_id: int, requested_source
         existing = db.scalar(select(Receipt).where(Receipt.file_sha256 == sha256))
         if existing is not None:
             return _duplicate(filename, existing)
-        try:
-            fields = _read_fields(extractor.read_receipt(data, checked.kind))
-        except extractor.ExtractionError as err:
-            # The paper may be in the trash already: keep the receipt, unread, whatever went wrong.
-            fields = {"needs_review": True}
-            message = str(err)
+        if extractor.enabled():
+            try:
+                fields = _read_fields(extractor.read_receipt(data, checked.kind))
+            except extractor.ExtractionError as err:
+                # The paper may be in the trash already: keep the receipt, unread, whatever went wrong.
+                message = str(err)
     except storage.FileRejected as err:
         return UploadResult(filename=filename, status="error", message=str(err))
 
@@ -133,6 +134,7 @@ def search_receipts(
     category: Category | None = None,
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
+    unread: bool = False,
     db: Session = Depends(get_db),
 ):
     query = select(Receipt)
@@ -154,6 +156,8 @@ def search_receipts(
         query = query.where(_contains(Receipt.merchant, merchant.strip()))
     if category is not None:
         query = query.where(Receipt.category == category)
+    if unread:
+        query = query.where(UNREAD)
     if from_date is not None:
         query = query.where(sort_date >= from_date.isoformat())
     if to_date is not None:
@@ -186,11 +190,11 @@ def update_receipt(receipt_id: int, body: ReceiptUpdate, db: Session = Depends(g
 
 @router.post("/{receipt_id}/read", response_model=ReceiptOut)
 def read_again(receipt_id: int, db: Session = Depends(get_db)):
-    """For a receipt saved unread. One already read is refused, so corrections can't be overwritten."""
+    """With an API key, for a receipt still unread. One already read is refused, so corrections can't be overwritten."""
     receipt = _get_or_404(db, receipt_id)
     if not receipt.image_path:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This receipt has no file.")
-    if receipt.raw_text:
+    if not receipt.unread:
         raise HTTPException(status.HTTP_409_CONFLICT, "This receipt was already read.")
     with open(storage.file_path(receipt.image_path), "rb") as f:
         data = f.read()

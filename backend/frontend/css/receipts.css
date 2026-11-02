@@ -45,6 +45,16 @@ input:focus-visible + .btn-big { outline: 2px solid var(--accent); outline-offse
 .upload-row.failed { border-color: #fecaca; }
 .upload-row.failed .upload-state { color: var(--danger); }
 
+.to-read-banner {
+  display: block;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--review-border);
+  border-radius: 8px;
+  background: var(--review);
+  color: #78500f;
+  font-weight: 600;
+}
 .search-form { margin-bottom: 12px; }
 .filters summary { display: inline-block; padding: 8px 0; color: var(--accent-hover); cursor: pointer; font-size: 0.9rem; }
 .filter-grid {
@@ -55,6 +65,8 @@ input:focus-visible + .btn-big { outline: 2px solid var(--accent); outline-offse
   padding: 4px 0 8px;
 }
 .filter-grid label { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.filter-grid .filter-check { flex-direction: row; align-items: center; gap: 8px; min-height: 42px; }
+.filter-check input { width: 20px; height: 20px; min-height: 0; flex: none; }
 
 #list-status { margin-bottom: 8px; }
 
@@ -128,7 +140,7 @@ input:focus-visible + .btn-big { outline: 2px solid var(--accent); outline-offse
 .add-item { align-self: flex-start; }
 .raw-text summary { padding: 10px 0; color: var(--accent-hover); cursor: pointer; font-size: 0.9rem; }
 .detail-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; }
-.detail-actions button[type="submit"] { flex: 1; font-weight: 600; }
+.detail-actions button[type="submit"], #detail-save-next { flex: 1; font-weight: 600; }
 
 @media (max-width: 760px) {
   .detail-grid { grid-template-columns: minmax(0, 1fr); }

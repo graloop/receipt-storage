@@ -11,6 +11,9 @@ import { el, showStatus } from "../core/ui.js";
 const list = document.getElementById("receipt-list");
 const status = document.getElementById("list-status");
 const everyone = document.getElementById("search-everyone");
+const unreadOnly = document.getElementById("filter-unread");
+const banner = document.getElementById("to-read-banner");
+const hint = document.getElementById("to-read-hint");
 const fields = {
   q: document.getElementById("search-input"),
   scope: document.getElementById("filter-scope"),
@@ -29,6 +32,7 @@ function filterParams() {
   for (const key of FILTERS) {
     if (fields[key].value.trim()) params.set(key, fields[key].value.trim());
   }
+  if (unreadOnly.checked) params.set("unread", "1");
   return params;
 }
 
@@ -51,13 +55,14 @@ export function readAddress() {
   const params = new URLSearchParams(location.search);
   for (const key of FILTERS) fields[key].value = params.get(key) ?? "";
   fields.scope.value = params.get("scope") === "all" ? "all" : "mine";
+  unreadOnly.checked = params.get("unread") === "1";
   if (FILTERS.some((key) => key !== "q" && params.get(key)) || params.get("scope") === "all") {
     document.querySelector(".filters").open = true;
   }
 }
 
 function isFiltered() {
-  return FILTERS.some((key) => fields[key].value.trim());
+  return unreadOnly.checked || FILTERS.some((key) => fields[key].value.trim());
 }
 
 function dateLabel(receipt) {
@@ -87,7 +92,9 @@ function row(receipt) {
     el("span", { class: "receipt-total" }, formatMoney(receipt.total, receipt.currency)),
     meta,
   );
-  if (receipt.needs_review) link.append(el("span", { class: "review-badge" }, t("To review")));
+  if (receipt.needs_review) {
+    link.append(el("span", { class: "review-badge" }, receipt.unread ? t("To read") : t("To review")));
+  }
   if (receipt.items.length) link.append(el("span", { class: "receipt-items" }, itemsPreview(receipt)));
   link.addEventListener("click", (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey) return; // Let "open in a new tab" work.
@@ -97,6 +104,13 @@ function row(receipt) {
   return el("li", {}, link);
 }
 
+// Counts everyone's: one person can read the whole household's receipts in one go.
+async function updateBanner() {
+  const n = (await api("/api/receipts?unread=1")).length;
+  banner.textContent = isSingular(n) ? t("{n} receipt to read", { n }) : t("{n} receipts to read", { n });
+  banner.classList.toggle("hidden", n === 0 || unreadOnly.checked);
+}
+
 let latest = 0; // A slow, older search must not overwrite a newer one's results.
 
 export async function loadList() {
@@ -104,14 +118,18 @@ export async function loadList() {
   // On this screen only: an upload finishing after a tap on a receipt mustn't change that address.
   if (location.pathname === "/") history.replaceState({}, "", listAddress());
   everyone.classList.add("hidden");
+  hint.classList.toggle("hidden", !unreadOnly.checked);
   if (!list.children.length) showStatus(status, t("Loading..."));
   try {
-    const receipts = await api(`/api/receipts?${searchParams()}`);
+    const [receipts] = await Promise.all([api(`/api/receipts?${searchParams()}`), updateBanner()]);
     if (request !== latest) return;
     list.replaceChildren(...receipts.map(row));
     const n = receipts.length;
     if (n) showStatus(status, isSingular(n) ? t("{n} receipt", { n }) : t("{n} receipts", { n }));
-    else if (isFiltered()) {
+    else if (unreadOnly.checked) {
+      showStatus(status, t("Nothing left to read."));
+      hint.classList.add("hidden");
+    } else if (isFiltered()) {
       showStatus(status, t("No receipts match this search."));
       everyone.classList.toggle("hidden", fields.scope.value === "all");
     } else showStatus(status, t("No receipts yet. Take a photo or upload a file to start."));
@@ -134,6 +152,11 @@ document.getElementById("search-form").addEventListener("submit", (e) => {
 fields.q.addEventListener("input", loadSoon);
 fields.merchant.addEventListener("input", loadSoon);
 for (const key of ["scope", "category", "from", "to"]) fields[key].addEventListener("change", loadList);
+unreadOnly.addEventListener("change", loadList);
+banner.addEventListener("click", (e) => {
+  e.preventDefault();
+  go("/?unread=1&scope=all");
+});
 everyone.addEventListener("click", () => {
   fields.scope.value = "all";
   document.querySelector(".filters").open = true;
@@ -142,5 +165,6 @@ everyone.addEventListener("click", () => {
 document.getElementById("filter-clear").addEventListener("click", () => {
   for (const key of ["merchant", "category", "from", "to"]) fields[key].value = "";
   fields.scope.value = "mine";
+  unreadOnly.checked = false;
   loadList();
 });

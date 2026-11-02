@@ -49,6 +49,11 @@ class ExtractionError(Exception):
     """The receipt couldn't be read. The message is shown to the person."""
 
 
+def enabled() -> bool:
+    """With no key, receipts simply wait to be read by the Claude extension in Chrome."""
+    return bool(get_settings().anthropic_api_key.get_secret_value())
+
+
 def _document_block(data: bytes, kind: Literal["image", "pdf"]) -> dict:
     if kind == "pdf":
         block_type, media_type = "document", "application/pdf"

@@ -31,7 +31,7 @@ backend/.venv/bin/pip install -q --disable-pip-version-check -r backend/requirem
 
 if [ ! -f .env ]; then
   cp .env.example .env
-  echo "Created .env. Put your Anthropic key in it to read receipts."
+  echo "Created .env."
 fi
 
 echo "Starting Receipt Vault at http://127.0.0.1:8000"

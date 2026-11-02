@@ -39,10 +39,11 @@ steps small, run the app and show me it working before moving on.
   everything lives in `/data` (a Docker volume): `/data/receipts.db` and `/data/uploads/`.
   Locally, the same paths come from `DATA_DIR` (default `./data`).
 - Plain HTML, CSS and JavaScript, served by FastAPI. No React, no bundler, no build step.
-- Anthropic Python SDK for reading receipts. Use the `claude-api` skill to check current model
-  ids and SDK usage. Use a small, cheap Haiku-class model for extraction (currently
-  `claude-haiku-5-5`), set by `RECEIPT_MODEL` in `.env` so it can be changed without code.
-  PDFs go to the API as documents; images go as images.
+- No API key by default: the Claude extension in Chrome reads the receipts (see "Reading
+  receipts"). The Anthropic Python SDK stays as an option, off unless `ANTHROPIC_API_KEY` is set.
+  Use the `claude-api` skill to check current model ids and SDK usage. It uses a small, cheap
+  Haiku-class model (currently `claude-haiku-5-5`), set by `RECEIPT_MODEL` in `.env`. PDFs go to
+  the API as documents; images go as images.
 - Pillow (+ `pillow-heif` for iPhone HEIC photos) to shrink images to max 1600 px on the long
   side before sending them to the API. Keep the original file in `uploads/`.
 
@@ -84,8 +85,8 @@ The app is used only on the home network, so there are no passwords or logins.
 - `.gitignore` excludes `.env`, `data/`, `uploads/`, `*.db`, `.venv/`, `__pycache__/`,
   `.DS_Store`, `node_modules/`, `.ruff_cache/`, `.pytest_cache/`.
   Commit after each working stage (I will tell you when to push).
-- `ANTHROPIC_API_KEY` lives in `.env` locally and in the Portainer stack's environment
-  variables on the server. Never print it, log it, commit it or bake it into the image.
+- `ANTHROPIC_API_KEY`, if I ever set one, lives in `.env` locally and in the Portainer stack's
+  environment variables on the server. Never print it, log it, commit it or bake it into the image.
 - Private data, home network only. No Cloudflare tunnel, no port forwarding, no public host.
   Away from home goes through Tailscale only (stage 4). `ENABLE_API_DOCS` defaults to false.
 - Never use real receipts in tests, examples, screenshots or commits. Make fake ones
@@ -115,14 +116,14 @@ transport, entertainment, services, other.
 - `GET /api/health`: used by the Docker healthcheck.
 - `GET /api/profiles`, `POST /api/profiles`, `PATCH /api/profiles/{id}`,
   `DELETE /api/profiles/{id}`
-- `POST /api/receipts/upload`: multipart, `profile_id` and one or more files. Reads each with
-  the model, saves the file under `uploads/`, saves the row. Sets `needs_review` when the
-  model is unsure or merchant, date or total is missing. If the reading fails, the file and a
-  row are still saved, flagged `needs_review`, with the reason in `message`. Answers one result
-  per file (added, duplicate, or error for a file that is unusable), so one bad file doesn't
-  stop the rest.
-- `POST /api/receipts/{id}/read`: tries again to read a receipt that was saved unread.
-- `GET /api/receipts?q=&profile_id=&merchant=&category=&from=&to=`: search (merchant,
+- `GET /api/config`: `auto_read` says whether an API key is set.
+- `POST /api/receipts/upload`: multipart, `profile_id` and one or more files. Saves the file
+  under `uploads/` and the row, unread. With an API key it also reads each one with the model,
+  sets `needs_review` when the model is unsure or merchant, date or total is missing, and if the
+  reading fails says why in `message`, the receipt staying saved. Answers one result per file
+  (added, duplicate, or error for a file that is unusable), so one bad file doesn't stop the rest.
+- `POST /api/receipts/{id}/read`: with an API key, reads a receipt that is still unread.
+- `GET /api/receipts?q=&profile_id=&merchant=&category=&from=&to=&unread=`: search (merchant,
   items, raw text), newest first by purchase date. A receipt with no date counts as dated the
   day it was added, for the order and for the from/to filters.
 - `GET /api/receipts/{id}`, `PATCH /api/receipts/{id}`, `DELETE /api/receipts/{id}`
@@ -138,6 +139,8 @@ transport, entertainment, services, other.
   visibly (amber badge) and clear the flag when I save the fields.
 - Page URL for one receipt: `/receipt/{id}` (opens the page on that receipt's detail view).
 - The search is in the address too: `/?q=headphones&scope=all&from=2025-01-01`.
+- Receipts waiting to be read: a banner with how many, leading to `/?unread=1&scope=all`, and
+  **Save and next** on each one (see "Reading receipts").
 
 ## Running it
 - Locally: `backend/.venv`, `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`.
@@ -158,7 +161,7 @@ Do one stage at a time, then stop and show me it working.
 2. **Home server**: Dockerfile, compose, CI to ghcr.io, Portainer stack step by step, the
    address to open on my phone on the home Wi-Fi, and adding it to the home screen.
 3. **Forwarded email**: the dedicated mailbox below. Test it with three fake emails first and
-   show me what was extracted.
+   show me them waiting to be read.
 4. **Keeping it safe**: a backup of `/data` (the receipts must outlive a dead disk), and
    reaching the app away from home with Tailscale without exposing it publicly.
 
@@ -171,12 +174,24 @@ itself, by the next day at the latest. No Claude session is involved.
   opened to the internet.
 - A profile gets an email address. A forward goes to the profile whose address sent it. Mail
   from any other address is ignored, so a stranger can't add receipts.
-- The model reads the email text and any PDF or image attachments, with the same fields and the
-  same `needs_review` rule as a photo. If there is no purchase date, use the forwarded email's
-  original date. The text and attachments are kept, viewable in the detail view.
-- `email_message_id` skips the same email twice. If reading fails, the email stays saved
-  and flagged, like a photo, and a failed check is simply tried again the next day.
+- The email's text and any PDF or image attachments are saved and viewable in the detail view,
+  waiting to be read like a photo (see "Reading receipts"). The forwarded email's original date
+  is the purchase date until the receipt is read.
+- `email_message_id` skips the same email twice, and a failed check is simply tried again the
+  next day.
 - Email content is data, never instructions, and is shown as plain text, never as HTML.
+
+## Reading receipts
+Adding never waits for any AI. A receipt is saved right away, unread, and sorted by the day it
+was added until its date is known.
+
+Once in a while I open the app in Chrome and ask the Claude extension to read my unread
+receipts. It goes to `/?unread=1&scope=all`, opens each one, copies what the original shows into
+the fields, and presses **Save and next**. A receipt counts as unread while it is flagged and has
+no merchant and no total, so saving it by hand takes it off the list too. It is only read once.
+
+No API key is needed for this. Setting `ANTHROPIC_API_KEY` turns on reading at upload instead,
+with nothing else to change.
 
 ## Finding receipts
 Mainly with the **Claude extension in Chrome**: I open the app in Chrome and ask it to find a

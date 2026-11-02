@@ -5,7 +5,7 @@ import { fillCategorySelect } from "../core/categories.js";
 import { formatDate } from "../core/format.js";
 import { t } from "../core/i18n.js";
 import { go } from "../core/router.js";
-import { getProfiles } from "../core/session.js";
+import { canAutoRead, getProfiles } from "../core/session.js";
 import { el, hideStatus, showStatus, showView } from "../core/ui.js";
 import { listAddress } from "./list.js";
 
@@ -14,6 +14,8 @@ const errorLine = document.getElementById("detail-error");
 const status = document.getElementById("detail-status");
 const itemRows = document.getElementById("field-items");
 const readButton = document.getElementById("detail-read");
+const saveNextButton = document.getElementById("detail-save-next");
+const form = document.getElementById("detail-form");
 const fields = {
   merchant: document.getElementById("field-merchant"),
   purchased_at: document.getElementById("field-date"),
@@ -86,8 +88,12 @@ function fill(receipt) {
   fields.raw_text.value = receipt.raw_text ?? "";
   itemRows.replaceChildren();
   receipt.items.forEach(addItemRow);
-  document.getElementById("detail-review").classList.toggle("hidden", !receipt.needs_review);
-  readButton.classList.toggle("hidden", Boolean(receipt.raw_text) || !receipt.file_type);
+  document.getElementById("detail-review").classList.toggle("hidden", !receipt.needs_review || receipt.unread);
+  document.getElementById("detail-unread").classList.toggle("hidden", !receipt.unread);
+  readButton.classList.toggle("hidden", !receipt.unread || !receipt.file_type || !canAutoRead());
+  saveNextButton.classList.toggle("hidden", !receipt.unread);
+  // Open when the text is what's being asked for: a closed section is easy to miss.
+  document.querySelector(".raw-text").open = receipt.unread;
   // The tab's name: tells apart several open receipts, for a person or for the Claude extension.
   document.title = `${receipt.merchant || t("Unknown merchant")}, ${formatDate(receipt.purchased_at)} - Receipt Vault`;
 }
@@ -125,8 +131,8 @@ readButton.addEventListener("click", async () => {
 });
 document.getElementById("add-item").addEventListener("click", () => addItemRow());
 
-document.getElementById("detail-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+// Answers whether it worked; if not, the reason is on the page.
+async function save() {
   hideStatus(status);
   try {
     const saved = await api(
@@ -146,6 +152,23 @@ document.getElementById("detail-form").addEventListener("submit", async (e) => {
     fill(saved);
     showStatus(status, t("Saved"));
     status.classList.add("ok");
+    return true;
+  } catch (err) {
+    showStatus(status, err.message, true);
+    return false;
+  }
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  save();
+});
+
+saveNextButton.addEventListener("click", async () => {
+  if (!form.reportValidity() || !(await save())) return;
+  try {
+    const [next] = await api("/api/receipts?unread=1");
+    go(next ? `/receipt/${next.id}` : "/?unread=1&scope=all");
   } catch (err) {
     showStatus(status, err.message, true);
   }
