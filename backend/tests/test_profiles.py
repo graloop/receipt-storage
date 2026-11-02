@@ -71,3 +71,24 @@ def test_removing_a_profile_removes_its_files(client, profile):
 def test_unknown_profile(client):
     assert client.patch("/api/profiles/99", json={"name": "X"}).status_code == 404
     assert client.delete("/api/profiles/99").status_code == 404
+
+
+def test_email_is_stored_lowercase_and_can_be_cleared(client, profile):
+    url = f"/api/profiles/{profile['id']}"
+    assert client.patch(url, json={"email": " Alex@Example.COM "}).json()["email"] == "alex@example.com"
+    # Changing something else leaves it alone.
+    assert client.patch(url, json={"name": "Alexa"}).json()["email"] == "alex@example.com"
+    assert client.patch(url, json={"email": ""}).json()["email"] is None
+
+
+def test_an_email_belongs_to_one_profile(client, profile):
+    client.patch(f"/api/profiles/{profile['id']}", json={"email": "alex@example.com"})
+    assert client.post("/api/profiles", json={"name": "Sam", "email": "ALEX@example.com"}).status_code == 409
+    sam = client.post("/api/profiles", json={"name": "Sam"}).json()
+    assert client.patch(f"/api/profiles/{sam['id']}", json={"email": "alex@example.com"}).status_code == 409
+    # Its own address isn't "taken".
+    assert client.patch(f"/api/profiles/{profile['id']}", json={"email": "alex@example.com"}).status_code == 200
+
+
+def test_not_an_email_is_refused(client, profile):
+    assert client.patch(f"/api/profiles/{profile['id']}", json={"email": "nope"}).status_code == 422

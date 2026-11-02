@@ -23,7 +23,11 @@ def _receipt_count(db: Session, profile_id: int) -> int:
 
 def _out(db: Session, profile: Profile) -> ProfileOut:
     return ProfileOut(
-        id=profile.id, name=profile.name, color=profile.color, receipt_count=_receipt_count(db, profile.id)
+        id=profile.id,
+        name=profile.name,
+        color=profile.color,
+        email=profile.email,
+        receipt_count=_receipt_count(db, profile.id),
     )
 
 
@@ -38,6 +42,12 @@ def _name_taken(db: Session, name: str, ignore_id: int | None = None) -> bool:
     return any(p.id != ignore_id and p.name.casefold() == name.casefold() for p in db.scalars(select(Profile)))
 
 
+def _require_free_email(db: Session, email: str | None, ignore_id: int | None = None) -> None:
+    other = db.scalar(select(Profile).where(Profile.email == email)) if email else None
+    if other is not None and other.id != ignore_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This email is already used by another profile.")
+
+
 @router.get("", response_model=list[ProfileOut])
 def list_profiles(db: Session = Depends(get_db)):
     return [_out(db, p) for p in db.scalars(select(Profile).order_by(Profile.created_at, Profile.id))]
@@ -47,8 +57,9 @@ def list_profiles(db: Session = Depends(get_db)):
 def create_profile(body: ProfileCreate, db: Session = Depends(get_db)):
     if _name_taken(db, body.name):
         raise HTTPException(status.HTTP_409_CONFLICT, "This name is already used by another profile.")
+    _require_free_email(db, body.email)
     count = db.scalar(select(func.count()).select_from(Profile))
-    profile = Profile(name=body.name, color=body.color or PALETTE[count % len(PALETTE)])
+    profile = Profile(name=body.name, color=body.color or PALETTE[count % len(PALETTE)], email=body.email)
     db.add(profile)
     try:
         db.commit()
@@ -67,6 +78,9 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(g
         profile.name = body.name
     if body.color is not None:
         profile.color = body.color
+    if "email" in body.model_fields_set:  # Sending it empty clears it.
+        _require_free_email(db, body.email, ignore_id=profile.id)
+        profile.email = body.email
     db.commit()
     return _out(db, profile)
 

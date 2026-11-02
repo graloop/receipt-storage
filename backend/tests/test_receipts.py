@@ -4,8 +4,10 @@ from datetime import date, timedelta
 
 import pillow_heif
 from PIL import Image
+from sqlalchemy import text
 
 from app import extractor, storage
+from app.database import Base, add_missing_columns, engine
 
 from .conftest import make_extracted, png, upload
 
@@ -383,3 +385,20 @@ def test_uploads_are_not_reachable_any_other_way(client, profile):
     name = uploaded_files()[0].name
     for path in (f"/uploads/{name}", f"/data/uploads/{name}", f"/{name}"):
         assert client.get(path).status_code == 404
+
+
+def test_a_new_version_keeps_what_is_on_the_server(client):
+    """An older database, missing a column added since: the data stays and the column appears."""
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE receipts"))
+        conn.execute(text("DROP TABLE profiles"))
+        conn.execute(
+            text("CREATE TABLE profiles (id INTEGER PRIMARY KEY, name VARCHAR(40) UNIQUE, color VARCHAR(7), created_at DATETIME)")
+        )
+        conn.execute(text("INSERT INTO profiles VALUES (1, 'Old', '#059669', '2026-01-01 00:00:00')"))
+    Base.metadata.create_all(bind=engine)
+    add_missing_columns()
+    add_missing_columns()  # Running it at every start changes nothing more.
+    profile = client.get("/api/profiles").json()[0]
+    assert profile["name"] == "Old"
+    assert profile["email"] is None

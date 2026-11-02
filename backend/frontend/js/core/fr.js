@@ -44,6 +44,8 @@ export const FR = {
   'This receipt hasn\'t been read yet. Copy what the original shows into the fields, including all its text under "Text read from the receipt".':
     "Ce reçu n'a pas encore été lu. Copiez ce que montre l'original dans les champs, y compris tout son texte sous « Texte lu sur le reçu ».",
   "Save and next": "Enregistrer et suivant",
+  "Forwarded receipts": "Reçus transférés",
+  "Check the mailbox now": "Vérifier la boîte maintenant",
   "Read this receipt again": "Relire ce reçu",
   Save: "Enregistrer",
   Delete: "Supprimer",
@@ -88,6 +90,20 @@ export const FR = {
   "Nothing left to read.": "Plus rien à lire.",
   "To read": "À lire",
   "Saved, will be read later": "Enregistré, sera lu plus tard",
+  "Email for forwarded receipts": "Courriel pour les reçus transférés",
+  "Forward receipts to {address} from your profile's email.":
+    "Transférez vos reçus à {address} depuis le courriel de votre profil.",
+  "Checked automatically once a day. Not checked yet.":
+    "Vérifiée automatiquement une fois par jour. Pas encore vérifiée.",
+  "Checked automatically once a day. Last check: {date}, {n} added.":
+    "Vérifiée automatiquement une fois par jour. Dernière vérification : {date}, {n} ajouté(s).",
+  "Checked automatically once a day. Last check: {date}, {n} added, {ignored} from unknown addresses.":
+    "Vérifiée automatiquement une fois par jour. Dernière vérification : {date}, {n} ajouté(s), {ignored} d'adresses inconnues.",
+  "Last check: {date}. {error}": "Dernière vérification : {date}. {error}",
+  "Checking...": "Vérification...",
+  'This receipt came by email and hasn\'t been read yet. Its text is under "Text read from the receipt": keep it there, and copy the merchant, date, total and items into the fields.':
+    "Ce reçu est arrivé par courriel et n'a pas encore été lu. Son texte est sous « Texte lu sur le reçu » : laissez-le là, et copiez le commerçant, la date, le total et les articles dans les champs.",
+  "This receipt came by email. Its text is below.": "Ce reçu est arrivé par courriel. Son texte est plus bas.",
   "Waiting...": "En attente...",
   "Reading the receipt...": "Lecture du reçu...",
   "Added: {summary}": "Ajouté : {summary}",
@@ -111,6 +127,12 @@ export const FR = {
   "Receipt not found.": "Reçu introuvable.",
   "This receipt was already read.": "Ce reçu a déjà été lu.",
   "This name is already used by another profile.": "Ce nom est déjà utilisé par un autre profil.",
+  "This email is already used by another profile.": "Ce courriel est déjà utilisé par un autre profil.",
+  "This doesn't look like an email address.": "Ceci ne ressemble pas à une adresse courriel.",
+  "No mailbox is set up.": "Aucune boîte n'est configurée.",
+  "The mailbox is being checked right now.": "La boîte est en train d'être vérifiée.",
+  "Couldn't check the mailbox. Check its address and app password.":
+    "Impossible de vérifier la boîte. Vérifiez son adresse et son mot de passe d'application.",
   "This profile still has receipts.": "Ce profil a encore des reçus.",
   "This file is empty.": "Ce fichier est vide.",
   "This file is too big (15 MB maximum).": "Ce fichier est trop gros (15 Mo maximum).",

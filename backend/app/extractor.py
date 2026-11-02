@@ -54,7 +54,9 @@ def enabled() -> bool:
     return bool(get_settings().anthropic_api_key.get_secret_value())
 
 
-def _document_block(data: bytes, kind: Literal["image", "pdf"]) -> dict:
+def _document_block(data: bytes, kind: Literal["image", "pdf", "text"]) -> dict:
+    if kind == "text":  # A forwarded email's words.
+        return {"type": "text", "text": data.decode("utf-8", "replace")}
     if kind == "pdf":
         block_type, media_type = "document", "application/pdf"
     else:
@@ -64,7 +66,7 @@ def _document_block(data: bytes, kind: Literal["image", "pdf"]) -> dict:
     return {"type": block_type, "source": {"type": "base64", "media_type": media_type, "data": encoded}}
 
 
-def read_receipt(data: bytes, kind: Literal["image", "pdf"]) -> ExtractedReceipt:
+def read_receipt(data: bytes, kind: Literal["image", "pdf", "text"]) -> ExtractedReceipt:
     settings = get_settings()
     api_key = settings.anthropic_api_key.get_secret_value()
     if not api_key:

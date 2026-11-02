@@ -2,6 +2,7 @@
 # serves the front end. The uploaded files are not served from here: only the
 # API's image route gives them out.
 
+import logging
 import os
 import re
 from contextlib import asynccontextmanager
@@ -10,11 +11,14 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import extractor
+from . import extractor, mail
 from .config import get_settings
-from .database import Base, engine
+from .database import Base, add_missing_columns, engine
+from .routers import mail as mail_router
 from .routers import profiles, receipts
+from .version import VERSION
 
+logging.basicConfig(level=logging.INFO)  # What the app says goes to `docker logs`.
 settings = get_settings()
 
 
@@ -22,7 +26,11 @@ settings = get_settings()
 async def lifespan(_app: FastAPI):
     # create_all only creates what's missing, so existing data is left alone.
     Base.metadata.create_all(bind=engine)
+    add_missing_columns()
+    stop_mail = mail.start_daily_check()
     yield
+    if stop_mail:
+        stop_mail.set()
 
 
 app = FastAPI(
@@ -35,6 +43,7 @@ app = FastAPI(
 
 app.include_router(profiles.router)
 app.include_router(receipts.router)
+app.include_router(mail_router.router)
 
 
 @app.get("/api/health")
@@ -76,7 +85,8 @@ def index():
         version = int(os.path.getmtime(os.path.join(_FRONTEND_DIR, path)))
         return f'{match.group(1)}="/{path}?v={version}"'
 
-    return HTMLResponse(_LOCAL_ASSET.sub(versioned, html), headers={"Cache-Control": "no-cache"})
+    html = _LOCAL_ASSET.sub(versioned, html).replace("__APP_VERSION__", VERSION)
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 app.mount("/", RevalidatingStaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")

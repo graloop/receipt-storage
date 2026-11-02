@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     # The model that reads receipts: small and cheap is enough for this job.
     receipt_model: str = "claude-haiku-5-5"
 
+    # The mailbox made only for forwarded receipts: a Gmail address and an app
+    # password. Both empty: the app checks no mail.
+    receipts_imap_user: str = ""
+    receipts_imap_password: SecretStr = SecretStr("")
+    receipts_imap_host: str = "imap.gmail.com"
+
     # Swagger UI at /docs. Off by default so the API isn't advertised.
     enable_api_docs: bool = False
 

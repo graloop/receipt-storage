@@ -4,7 +4,7 @@ import json
 import os
 import unicodedata
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import get_settings
@@ -23,9 +23,9 @@ class Base(DeclarativeBase):
     pass
 
 
-def fold(text: str | None) -> str:
+def fold(value: str | None) -> str:
     """Lowercase, no accents: searching "epicerie" finds "Épicerie" and the other way around."""
-    decomposed = unicodedata.normalize("NFKD", text or "")
+    decomposed = unicodedata.normalize("NFKD", value or "")
     return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
 
 
@@ -49,3 +49,20 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def add_missing_columns() -> None:
+    """Tiny forward-only migration, so a new version keeps the receipts already on
+    the server: create_all() never alters existing tables, so add any *nullable*
+    column a model gained since the table was created."""
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in existing or not column.nullable:
+                    continue
+                col_type = column.type.compile(dialect=engine.dialect)
+                conn.execute(text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {col_type}"))

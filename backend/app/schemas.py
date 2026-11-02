@@ -27,11 +27,20 @@ ProfileName = Annotated[str, Field(min_length=1, max_length=40)]
 class ProfileCreate(BaseModel):
     name: ProfileName
     color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    email: str | None = Field(default=None, max_length=200)
 
     @field_validator("name", mode="before")
     @classmethod
     def _tidy_name(cls, value):
         return " ".join(value.split()) if isinstance(value, str) else value
+
+    @field_validator("email")
+    @classmethod
+    def _tidy_email(cls, value: str | None) -> str | None:
+        email = (value or "").strip().casefold()
+        if email and not re.fullmatch(r"[^@\s]+@[^@\s]+", email):
+            raise ValueError("This doesn't look like an email address.")
+        return email or None
 
 
 class ProfileUpdate(ProfileCreate):
@@ -44,6 +53,7 @@ class ProfileOut(BaseModel):
     id: int
     name: str
     color: str
+    email: str | None = None
     receipt_count: int = 0
 
 

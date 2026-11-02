@@ -18,9 +18,20 @@ class Profile(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(40), unique=True)
     color: Mapped[str] = mapped_column(String(7))
+    # Forwards from this address go to this profile. Always lowercase.
+    email: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     receipts: Mapped[list["Receipt"]] = relationship(back_populates="profile")
+
+
+class AppState(Base):
+    """Small things to remember between restarts, like when the mail was last checked."""
+
+    __tablename__ = "app_state"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON)
 
 
 class Receipt(Base):

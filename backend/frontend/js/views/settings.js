@@ -1,7 +1,7 @@
 // The settings gear: the language, and adding, renaming and removing profiles.
 
 import { api, json } from "../core/api.js";
-import { getLang, isSingular, setLang, t } from "../core/i18n.js";
+import { getLang, isSingular, locale, setLang, t } from "../core/i18n.js";
 import { registerMenu } from "../core/menus.js";
 import { route } from "../core/router.js";
 import { getProfiles, loadProfiles, onProfilesChange } from "../core/session.js";
@@ -30,6 +30,17 @@ async function rename(profile, input) {
     route(); // The list shows owners' names.
   } catch (err) {
     input.value = profile.name;
+    showStatus(status, err.message, true);
+  }
+}
+
+async function changeEmail(profile, input) {
+  hideStatus(status);
+  try {
+    await api(`/api/profiles/${profile.id}`, json("PATCH", { email: input.value }));
+    await loadProfiles();
+  } catch (err) {
+    input.value = profile.email ?? "";
     showStatus(status, err.message, true);
   }
 }
@@ -75,13 +86,66 @@ function render() {
       );
       removeBtn.setAttribute("aria-label", t("Remove this profile"));
       removeBtn.addEventListener("click", () => remove(profile).catch((err) => showStatus(status, err.message, true)));
-      return el("li", { class: "settings-profile" }, avatarFor(profile), input, removeBtn);
+      const email = el("input", {
+        type: "email",
+        maxlength: "200",
+        value: profile.email ?? "",
+        placeholder: t("Email for forwarded receipts"),
+        "aria-label": t("Email for forwarded receipts"),
+      });
+      email.addEventListener("change", () => changeEmail(profile, email));
+      return el("li", { class: "settings-profile" }, avatarFor(profile), input, removeBtn, email);
     }),
   );
 }
 
 onProfilesChange(render);
-registerMenu("settings-btn", "settings-panel", () => hideStatus(status));
+registerMenu("settings-btn", "settings-panel", () => {
+  hideStatus(status);
+  loadMailState().catch((err) => showStatus(status, err.message, true));
+});
+
+function lastCheckText(last) {
+  if (!last) return t("Checked automatically once a day. Not checked yet.");
+  const date = new Date(last.at).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" });
+  if (last.error) return t("Last check: {date}. {error}", { date, error: t(last.error) });
+  if (last.ignored) {
+    return t("Checked automatically once a day. Last check: {date}, {n} added, {ignored} from unknown addresses.", {
+      date,
+      n: last.added,
+      ignored: last.ignored,
+    });
+  }
+  return t("Checked automatically once a day. Last check: {date}, {n} added.", { date, n: last.added });
+}
+
+function showMailState(state) {
+  document.getElementById("mail-section").classList.toggle("hidden", !state.configured);
+  if (!state.configured) return;
+  document.getElementById("mail-address").textContent = t("Forward receipts to {address} from your profile's email.", {
+    address: state.address,
+  });
+  document.getElementById("mail-last").textContent = lastCheckText(state.last_check);
+}
+
+async function loadMailState() {
+  showMailState(await api("/api/mail"));
+}
+
+document.getElementById("mail-check").addEventListener("click", async () => {
+  const button = document.getElementById("mail-check");
+  hideStatus(status);
+  button.disabled = true;
+  document.getElementById("mail-last").textContent = t("Checking...");
+  try {
+    showMailState(await api("/api/mail/check", { method: "POST" }));
+    route();
+  } catch (err) {
+    showStatus(status, err.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
 
 document.getElementById("settings-add-profile").addEventListener("submit", async (e) => {
   e.preventDefault();
