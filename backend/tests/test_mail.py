@@ -206,6 +206,16 @@ def test_html_only_email_becomes_plain_text(client, box, alex):
         assert leftover not in text
 
 
+def test_table_cells_stay_apart_and_rows_on_their_own_lines(client, box, alex):
+    html = "<table><tr><td>Burger</td><td>19.50</td></tr><tr><td>Total</td><td>40.03 CAD</td></tr></table>"
+    box.add(forward(None, html=html))
+    check(client)
+    text = receipts(client)[0]["raw_text"]
+    assert "Burger 19.50" in text
+    assert "Total 40.03 CAD" in text
+    assert "19.50 Total" not in text
+
+
 def test_plain_text_is_preferred_over_html(client, box, alex):
     box.add(forward("The plain words", html="<p>The html words</p>"))
     check(client)
