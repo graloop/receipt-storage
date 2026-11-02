@@ -153,8 +153,8 @@ transport, entertainment, services, other.
   `America/Toronto`. The Dockerfile runs as a non-root user that owns `/data`.
 - Portainer can't build images through its agent, so CI builds the image and publishes it to
   ghcr.io on every push to main (copy the training app's `ci.yml`, actions pinned to commits).
-  This repository is private, so the image is private: Portainer needs a ghcr.io registry
-  entry with a GitHub token that has `read:packages`. Explain that step when we get there.
+  This repository and its image are public (MIT license), so Portainer pulls it with no token.
+  Your receipts are never in either: they stay in the `/data` volume on the server.
 - `docker-compose.build.yml` builds from the checkout instead, for testing the image locally.
 
 ## Making a new version
