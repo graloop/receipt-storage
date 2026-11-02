@@ -13,23 +13,14 @@ again. Details and rules are in [CLAUDE.md](CLAUDE.md).
 The app has no passwords, so keep it on your home network: **never forward port 8020 on your
 router** and don't put it behind a public tunnel. Anyone on your Wi-Fi can open it.
 
-### 1. Let Portainer download the app (once)
-
-The image is private, like this repository.
-
-1. On GitHub: Settings → Developer settings → Personal access tokens → Tokens (classic) →
-   Generate new token. Tick only **`read:packages`**, and copy the token.
-2. In Portainer: Registries → Add registry → Custom registry. Registry URL `ghcr.io`, turn on
-   Authentication, username `graloop`, password: the token.
-
-### 2. Start it
+### 1. Start it
 
 In Portainer: Stacks → Add stack → name it `receipt-vault` → Web editor → paste
 [docker-compose.yml](docker-compose.yml) → Deploy the stack.
 
-Forwarded email isn't needed for a first test. For it, see step 4.
+Forwarded email isn't needed for a first test. For it, see step 3.
 
-### 3. Open it on your phone
+### 2. Open it on your phone
 
 1. Find the server's address on your network (the one you use for Portainer), and open
    `http://<server address>:8020` on your phone, on the home Wi-Fi.
@@ -37,7 +28,7 @@ Forwarded email isn't needed for a first test. For it, see step 4.
 3. Add it to the home screen. iPhone: Safari → Share → Add to Home Screen. Android: Chrome → ⋮ →
    Add to Home screen.
 
-### 4. Forwarded email (when you're ready)
+### 3. Forwarded email (when you're ready)
 
 1. Create a new Gmail address just for receipts, and turn on 2-Step Verification for it.
 2. On that account, go to https://myaccount.google.com/apppasswords and create an app password.
@@ -72,3 +63,7 @@ To go back: add `TAG=sha-xxxxxxx` to the stack's environment variables (the tags
 Packages on GitHub) and update the stack again.
 
 If the stack ever has to be removed, leave the `receipts_data` volume alone: it's all your receipts.
+
+## License
+
+[MIT](LICENSE)
