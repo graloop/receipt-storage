@@ -106,6 +106,14 @@ def test_scripts_never_build_html_from_strings():
     assert "insertAdjacentHTML" not in JS_SOURCE
 
 
+def test_deleting_a_receipt_asks_on_the_page(client):
+    # A browser pop-up would also stop the Claude extension, which can't answer one.
+    assert "confirm(" not in (FRONTEND / "js/views/detail.js").read_text(encoding="utf-8")
+    html = client.get("/").text
+    for element in ('id="delete-confirm"', 'id="delete-cancel"', 'id="delete-yes"'):
+        assert element in html
+
+
 def test_api_docs_are_off_by_default(client):
     assert client.get("/docs").status_code == 404
     assert client.get("/openapi.json").status_code == 404

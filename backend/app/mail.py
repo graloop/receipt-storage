@@ -91,18 +91,59 @@ def _html_to_text(html: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
+# An amount alone on its line: "$129.99", "129,99 $", "CAD 40.03", "40.03 CAD".
+_ONLY_AMOUNT = re.compile(r"^[-−]?\s*(?:[A-Z]{2,3}\s?)?[$€£]?\s?\d[\d\s.,]*(?:\s?(?:[$€£]|CAD|USD|EUR))?$")
+_HAS_AMOUNT = re.compile(r"[$€£]\s?\d|\d\s?[$€£]|\d\s?(?:CAD|USD|EUR)\b|\d[.,]\d{2}\b")
+
+
+def _is_amount(line: str) -> bool:
+    return bool(_ONLY_AMOUNT.match(line) and _HAS_AMOUNT.search(line))
+
+
+def _join_amounts(text: str) -> str:
+    """Puts an amount back beside its label. Shops lay these out in nested tables, so
+    "Order Total" and "$129.99" land on lines of their own, and the wrong number is easy to take."""
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        label = next((i for i in range(len(lines) - 1, -1, -1) if lines[i].strip()), None)
+        if (
+            label is not None
+            and _is_amount(stripped)
+            and re.search(r"[^\W\d_]", lines[label])
+            and not _HAS_AMOUNT.search(lines[label])
+        ):
+            lines[label + 1 :] = []  # Only blank lines were in between.
+            lines[label] = f"{lines[label].rstrip()} {stripped}"
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 def _part_text(part: EmailMessage) -> str:
     try:
         text = part.get_content()
     except (LookupError, ValueError):  # An unknown or wrong character set.
         text = (part.get_payload(decode=True) or b"").decode("utf-8", "replace")
-    return _html_to_text(text) if part.get_content_type() == "text/html" else text.strip()
+    return _join_amounts(_html_to_text(text) if part.get_content_type() == "text/html" else text.strip())
+
+
+def _body_text(message: EmailMessage) -> str:
+    """Plain text reads best, but some shops' is only "view this email in your browser", with
+    the receipt in the HTML version alone. Then the HTML version is the one to keep."""
+    plain_part = message.get_body(preferencelist=("plain",))
+    html_part = message.get_body(preferencelist=("html",))
+    plain = _part_text(plain_part) if plain_part is not None else ""
+    html = _part_text(html_part) if html_part is not None else ""
+    if not plain:
+        return html
+    lost_the_amounts = _HAS_AMOUNT.search(html) and not _HAS_AMOUNT.search(plain)
+    return html if lost_the_amounts or len(plain) * 3 < len(html) else plain
 
 
 def _contents(message: EmailMessage) -> tuple[str, list[tuple[str, bytes]]]:
     """The email's text, and its attached files. Logos inside the email don't count: they aren't attached."""
-    body = message.get_body(preferencelist=("plain", "html"))
-    texts = [_part_text(body)] if body is not None else []
+    texts = [_body_text(message)]
     files = []
     for part in message.iter_attachments():
         if part.get_content_type() == "message/rfc822":  # "Forward as attachment".

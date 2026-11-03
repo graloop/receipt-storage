@@ -44,6 +44,8 @@ export const FR = {
   'This receipt hasn\'t been read yet. Copy what the original shows into the fields, including all its text under "Text read from the receipt".':
     "Ce reçu n'a pas encore été lu. Copiez ce que montre l'original dans les champs, y compris tout son texte sous « Texte lu sur le reçu ».",
   "Save and next": "Enregistrer et suivant",
+  "Keep it": "Le garder",
+  "Yes, delete": "Oui, supprimer",
   "Forwarded receipts": "Reçus transférés",
   "Check the mailbox now": "Vérifier la boîte maintenant",
   "Read this receipt again": "Relire ce reçu",
@@ -110,7 +112,6 @@ export const FR = {
   "Added, please review: {summary}": "Ajouté, à vérifier : {summary}",
   "Already saved: {summary}": "Déjà enregistré : {summary}",
   "Receipt from {merchant}": "Reçu de {merchant}",
-  Saved: "Enregistré",
   "Item name": "Nom de l'article",
   Qty: "Qté",
   Price: "Prix",

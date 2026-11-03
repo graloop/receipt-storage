@@ -178,10 +178,17 @@
           </details>
 
           <p id="detail-status" class="status hidden" aria-live="polite"></p>
-          <div class="detail-actions">
+          <div id="detail-actions" class="detail-actions">
             <button type="submit">Save</button>
             <button id="detail-save-next" type="button" class="hidden">Save and next</button>
             <button id="detail-delete" type="button" class="btn-danger">Delete</button>
+          </div>
+          <div id="delete-confirm" class="delete-confirm hidden" role="alert">
+            <p>Delete this receipt? This can't be undone.</p>
+            <div class="detail-actions">
+              <button id="delete-cancel" type="button" class="btn-ghost">Keep it</button>
+              <button id="delete-yes" type="button" class="btn-danger">Yes, delete</button>
+            </div>
           </div>
         </form>
       </div>

@@ -216,6 +216,61 @@ def test_table_cells_stay_apart_and_rows_on_their_own_lines(client, box, alex):
     assert "19.50 Total" not in text
 
 
+# A receipt laid out the way shops do it, invented for these tests.
+SHOP_HTML = """<html><body><table><tr><td>
+<table><tr><td>Fake Runner 990</td><td><table><tr><td>$120.00</td></tr></table></td></tr></table>
+<table><tr><td>Tax</td></tr><tr><td>$9.99</td></tr></table>
+<table><tr><td>Order Total</td><td><table><tr><td><b>$129.99</b></td></tr></table></td></tr></table>
+</td></tr></table></body></html>"""
+
+
+def test_a_stub_plain_part_does_not_hide_the_receipt_in_the_html(client, box, alex):
+    box.add(forward("Thanks for your order! View it in your browser: https://shop.example/o/1", html=SHOP_HTML))
+    check(client)
+    assert "Order Total $129.99" in receipts(client)[0]["raw_text"]
+
+
+def test_a_plain_part_without_amounts_loses_to_html_with_them(client, box, alex):
+    box.add(forward("Your order is on its way", html="<p>Paid: $5.00</p>"))
+    check(client)
+    assert "Paid: $5.00" in receipts(client)[0]["raw_text"]
+
+
+def test_a_full_plain_part_is_still_preferred(client, box, alex):
+    plain = "Fake Runner 990 $120.00\nTax $9.99\nOrder Total $129.99 (from the plain part)"
+    box.add(forward(plain, html=SHOP_HTML))
+    check(client)
+    assert "(from the plain part)" in receipts(client)[0]["raw_text"]
+
+
+def test_each_amount_lands_beside_its_own_label(client, box, alex):
+    box.add(forward(None, html=SHOP_HTML))
+    check(client)
+    text = receipts(client)[0]["raw_text"]
+    for line in ("Fake Runner 990 $120.00", "Tax $9.99", "Order Total $129.99"):
+        assert line in text.splitlines()
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Order Total\n\n$129.99", "Order Total $129.99"),
+        ("Total payé\n129,99 $", "Total payé 129,99 $"),
+        ("Total\nCAD 40.03", "Total CAD 40.03"),
+        ("Total\n40.03 CAD", "Total 40.03 CAD"),
+        ("Burger\n19.50\nTotal\n40.03", "Burger 19.50\nTotal 40.03"),
+        # Not amounts, or no label to join: left as they are.
+        ("Order number\n12345", "Order number\n12345"),
+        ("Phone\n514-555-0100", "Phone\n514-555-0100"),
+        ("Total $5.00\n$6.00", "Total $5.00\n$6.00"),
+        ("$5.00\n$6.00", "$5.00\n$6.00"),
+        ("First line\n\nSecond line", "First line\n\nSecond line"),
+    ],
+)
+def test_join_amounts(text, expected):
+    assert mail._join_amounts(text) == expected
+
+
 def test_plain_text_is_preferred_over_html(client, box, alex):
     box.add(forward("The plain words", html="<p>The html words</p>"))
     check(client)

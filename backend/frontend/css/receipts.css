@@ -141,6 +141,9 @@ input:focus-visible + .btn-big { outline: 2px solid var(--accent); outline-offse
 .raw-text summary { padding: 10px 0; color: var(--accent-hover); cursor: pointer; font-size: 0.9rem; }
 .detail-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; }
 .detail-actions button[type="submit"], #detail-save-next { flex: 1; font-weight: 600; }
+.delete-confirm { margin-top: 8px; padding: 12px; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; }
+.delete-confirm p { margin: 0; font-weight: 600; }
+.delete-confirm .detail-actions button { flex: 1; }
 
 @media (max-width: 760px) {
   .detail-grid { grid-template-columns: minmax(0, 1fr); }

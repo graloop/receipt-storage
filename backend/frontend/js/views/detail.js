@@ -16,6 +16,9 @@ const itemRows = document.getElementById("field-items");
 const readButton = document.getElementById("detail-read");
 const saveNextButton = document.getElementById("detail-save-next");
 const form = document.getElementById("detail-form");
+const actions = document.getElementById("detail-actions");
+const deleteConfirm = document.getElementById("delete-confirm");
+const deleteYes = document.getElementById("delete-yes");
 const fields = {
   merchant: document.getElementById("field-merchant"),
   purchased_at: document.getElementById("field-date"),
@@ -79,8 +82,16 @@ function showFile(receipt) {
     receipt.source === "email" ? t("This receipt came by email. Its text is below.") : t("This receipt has no file.");
 }
 
+// Delete asks on the page, not in a browser pop-up: the receipt stays in view, and
+// a pop-up would also stop the Claude extension, which can't answer one.
+function askBeforeDeleting(asking) {
+  deleteConfirm.classList.toggle("hidden", !asking);
+  actions.classList.toggle("hidden", asking);
+}
+
 function fill(receipt) {
   current = receipt;
+  askBeforeDeleting(false);
   fields.profile_id.replaceChildren(...getProfiles().map((p) => el("option", { value: p.id }, p.name)));
   fields.merchant.value = receipt.merchant ?? "";
   fields.purchased_at.value = receipt.purchased_at ?? "";
@@ -147,7 +158,7 @@ document.getElementById("add-item").addEventListener("click", () => addItemRow()
 async function save() {
   hideStatus(status);
   try {
-    const saved = await api(
+    await api(
       `/api/receipts/${current.id}`,
       json("PATCH", {
         merchant: fields.merchant.value.trim() || null,
@@ -161,9 +172,6 @@ async function save() {
         needs_review: false, // Someone just looked at it.
       }),
     );
-    fill(saved);
-    showStatus(status, t("Saved"));
-    status.classList.add("ok");
     return true;
   } catch (err) {
     showStatus(status, err.message, true);
@@ -171,9 +179,9 @@ async function save() {
   }
 }
 
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  save();
+  if (await save()) go(listAddress());
 });
 
 saveNextButton.addEventListener("click", async () => {
@@ -186,12 +194,21 @@ saveNextButton.addEventListener("click", async () => {
   }
 });
 
-document.getElementById("detail-delete").addEventListener("click", async () => {
-  if (!confirm(t("Delete this receipt? This can't be undone."))) return;
+document.getElementById("detail-delete").addEventListener("click", () => {
+  hideStatus(status);
+  askBeforeDeleting(true);
+  document.getElementById("delete-cancel").focus(); // The safe answer comes first.
+});
+document.getElementById("delete-cancel").addEventListener("click", () => askBeforeDeleting(false));
+deleteYes.addEventListener("click", async () => {
+  deleteYes.disabled = true; // A second tap would ask to delete it twice.
   try {
     await api(`/api/receipts/${current.id}`, { method: "DELETE" });
     go(listAddress());
   } catch (err) {
+    askBeforeDeleting(false);
     showStatus(status, err.message, true);
+  } finally {
+    deleteYes.disabled = false;
   }
 });
