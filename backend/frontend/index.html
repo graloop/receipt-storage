@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#022c22" />
   <title>Receipt Vault</title>
+  <script>
+    // Night mode before anything is drawn, so the page never flashes white (see js/core/theme.js).
+    var theme = null;
+    try { theme = localStorage.getItem("rv_theme"); } catch (e) {}
+    if (theme !== "dark" && theme !== "light") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+  </script>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -16,6 +23,12 @@
   <header class="topbar">
     <h1 class="brand"><a href="/" id="home-link" class="brand-link"><span class="logo" role="img" aria-label="graloop">gral<svg viewBox="-2 -2 116 60" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M56 28 C66 12 78 4 86 4 C99 4 108 15 108 28 C108 41 99 52 86 52 C78 52 66 44 56 28 C46 12 34 4 26 4 C13 4 4 15 4 28 C4 41 13 52 26 52 C34 52 46 44 56 28 Z"></path></svg>p</span><span>Receipt Vault</span></a></h1>
     <div class="topbar-actions">
+      <button id="theme-switch" type="button" class="theme-switch" role="switch" aria-checked="false" aria-label="Night mode" title="Night mode">
+        <span class="theme-switch-knob" aria-hidden="true">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"></circle><path d="M12 1.5v2.5M12 20v2.5M1.5 12H4M20 12h2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"></path></svg>
+          <svg class="moon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"></path></svg>
+        </span>
+      </button>
       <div id="profile-menu" class="menu hidden">
         <button id="profile-btn" type="button" class="user-badge" aria-haspopup="true" aria-expanded="false" aria-controls="profile-panel">
           <span id="profile-avatar" class="avatar" aria-hidden="true"></span>

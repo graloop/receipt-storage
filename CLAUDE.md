@@ -61,6 +61,10 @@ Same structure and style as the training app, in deep emerald instead of navy/bl
   `.logo` markup with the infinity-loop SVG for the "oo") and its CSS from `base.css`.
   The loop is stroked in `var(--accent)`; on the dark bar it may use a lighter emerald
   (`#34d399`) so it stands out.
+- Night mode: a sun/moon switch in the top bar. It follows the phone's own setting until it is
+  used, then the browser remembers the choice (`rv_theme`). Every colour is a token in `base.css`,
+  set twice: `:root` for the day and `:root[data-theme="dark"]` for night. The screen files only
+  use tokens (a test checks it), and index.html sets the theme before anything is drawn.
 - Mobile-first: it is used mostly on phones. Large tap targets, one column on small screens.
 - Add a web app manifest and icons (emerald background, the loop) so the page can be added
   to the phone's home screen. Set `theme-color` to `#022c22`.

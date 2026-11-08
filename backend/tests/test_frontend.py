@@ -114,6 +114,36 @@ def test_deleting_a_receipt_asks_on_the_page(client):
         assert element in html
 
 
+CSS = {name: (FRONTEND / "css" / name).read_text(encoding="utf-8") for name in ("base.css", "profiles.css", "receipts.css")}
+
+
+def _tokens(block_start: str) -> set[str]:
+    block = CSS["base.css"].split(block_start, 1)[1].split("}", 1)[0]
+    return set(re.findall(r"(--[\w-]+):", block))
+
+
+def test_night_mode_sets_every_colour_the_day_sets():
+    day, night = _tokens(":root {"), _tokens(':root[data-theme="dark"] {')
+    assert len(day) > 15
+    assert day == night
+
+
+def test_screen_styles_only_use_the_colour_settings():
+    # A colour written straight into these files would stay the same at night.
+    # White text on a green button and dark text on an amber badge read well in both.
+    for name in ("profiles.css", "receipts.css"):
+        colours = set(re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)", CSS[name]))
+        assert colours <= {"#fff", "#3b2300"}, (name, colours)
+
+
+def test_night_mode_is_set_before_the_page_is_drawn(client):
+    html = client.get("/").text
+    head = html.split("</head>", 1)[0]
+    assert "dataset.theme" in head
+    assert head.index("dataset.theme") < head.index("stylesheet")
+    assert 'id="theme-switch"' in html and 'role="switch"' in html
+
+
 def test_api_docs_are_off_by_default(client):
     assert client.get("/docs").status_code == 404
     assert client.get("/openapi.json").status_code == 404

@@ -3,6 +3,7 @@
 // address opens.
 
 import { translatePage } from "./core/i18n.js";
+import "./core/theme.js";
 import { go, setRouteHandler } from "./core/router.js";
 import { getCurrentProfile, loadConfig, loadProfiles } from "./core/session.js";
 import { showStatus, showView } from "./core/ui.js";

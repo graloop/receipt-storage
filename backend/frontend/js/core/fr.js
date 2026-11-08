@@ -5,6 +5,7 @@ export const FR = {
   // index.html
   "Switch profile": "Changer de profil",
   Settings: "Réglages",
+  "Night mode": "Mode nuit",
   Language: "Langue",
   Profiles: "Profils",
   "New profile's name": "Nom du nouveau profil",
