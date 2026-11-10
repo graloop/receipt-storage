@@ -31,7 +31,12 @@ logger = logging.getLogger(__name__)
 
 CHECK_EVERY = timedelta(hours=24)
 WAKE_UP_SECONDS = 600  # How often the thread looks at the clock, not how often it checks the mail.
-MAX_PER_CHECK = 200
+MAX_PER_CHECK = 200  # Emails from profiles opened per check; the rest wait for the next one.
+HEADERS_PER_FETCH = 500
+# A picture inside an email (not attached) is kept when it's this big, whatever the email says...
+INLINE_PHOTO_BYTES = 300_000
+# ...or this big when the email's text shows no amounts: a photo sent from a phone, not a shop's logo.
+INLINE_PICTURE_BYTES = 20_000
 MAX_TEXT_CHARS = 200_000
 STATE_KEY = "mail_last_check"
 
@@ -141,8 +146,22 @@ def _body_text(message: EmailMessage) -> str:
     return html if lost_the_amounts or len(plain) * 3 < len(html) else plain
 
 
+def _inline_pictures(message: EmailMessage, text: str) -> list[tuple[str, bytes]]:
+    """Pictures placed inside the email rather than attached, as phone mail apps do with a photo.
+    Shops' emails are full of them too (logos, products), so a small one only counts when the
+    text has no amounts, and a photo-sized one always does."""
+    pictures = []
+    for part in message.walk():
+        if part.get_content_maintype() != "image" or part.get_content_disposition() == "attachment":
+            continue
+        data = part.get_payload(decode=True) or b""
+        if len(data) >= INLINE_PHOTO_BYTES or (len(data) >= INLINE_PICTURE_BYTES and not _HAS_AMOUNT.search(text)):
+            pictures.append((part.get_filename() or "photo", data))
+    return pictures
+
+
 def _contents(message: EmailMessage) -> tuple[str, list[tuple[str, bytes]]]:
-    """The email's text, and its attached files. Logos inside the email don't count: they aren't attached."""
+    """The email's text, and its files: attachments, and pictures placed inside it that look like receipts."""
     texts = [_body_text(message)]
     files = []
     for part in message.iter_attachments():
@@ -153,7 +172,8 @@ def _contents(message: EmailMessage) -> tuple[str, list[tuple[str, bytes]]]:
             files.extend(inner_files)
         elif part.get_content_disposition() == "attachment":
             files.append((part.get_filename() or "file", part.get_payload(decode=True) or b""))
-    return "\n\n".join(t for t in texts if t), files
+    text = "\n\n".join(t for t in texts if t)
+    return text, files + _inline_pictures(message, text)
 
 
 _FORWARD_MARK = re.compile(r"forwarded message|message transfere|message d'origine|original message")
@@ -218,10 +238,11 @@ def _sent_date(message: EmailMessage) -> date | None:
     return sent.astimezone().date() if sent else None
 
 
-def _is_forged(message: EmailMessage) -> bool:
-    # Gmail adds its verdict on top, so the first header is the one to trust. Only
-    # an explicit failure counts: plenty of honest domains have no such policy.
-    return "dmarc=fail" in str(message.get("Authentication-Results", "")).lower()
+def _sender_proven(message: EmailMessage) -> bool:
+    # Anyone can write any address in "From". Gmail checks it (DMARC) and adds its verdict
+    # on top, so the first header is the one to trust; anything below it could be forged.
+    # Only a pass counts: no verdict at all proves nothing. Gmail, Outlook and iCloud all pass.
+    return "dmarc=pass" in str(message.get("Authentication-Results", "")).lower()
 
 
 # --- One email ---
@@ -229,7 +250,7 @@ def _is_forged(message: EmailMessage) -> bool:
 
 def _profile_for(db: Session, message: EmailMessage) -> Profile | None:
     sender = parseaddr(str(message.get("From", "")))[1].casefold()
-    if not sender or _is_forged(message):
+    if not sender or not _sender_proven(message):
         return None
     return db.scalar(select(Profile).where(Profile.email == sender))
 
@@ -267,12 +288,14 @@ def process(db: Session, raw: bytes) -> str:
     raw_text = "\n".join([f"Subject: {subject}", text, *notes]).strip()[:MAX_TEXT_CHARS]
     sent = original_date(text) or _sent_date(message)
 
-    saved_files, new = [], 0
+    saved_files, new, seen = [], 0, set()
     try:
         for index, (data, checked) in enumerate(usable):
             sha256 = hashlib.sha256(data).hexdigest()
-            if db.scalar(select(Receipt).where(Receipt.file_sha256 == sha256)) is not None:
+            # The same file twice in one email, or already in the app: kept once.
+            if sha256 in seen or db.scalar(select(Receipt).where(Receipt.file_sha256 == sha256)) is not None:
                 continue
+            seen.add(sha256)
             fields = _fields(data, checked.kind, sent)
             fields.setdefault("raw_text", raw_text)
             stored_name = storage.save_file(data, checked.extension)
@@ -311,6 +334,18 @@ def process(db: Session, raw: bytes) -> str:
 # --- The mailbox ---
 
 
+def _sender_headers(imap: imaplib.IMAP4, uids: list[bytes]):
+    """Who sent each unread email and Gmail's verdict on it, without downloading the emails.
+    Only those from a profile are opened, so a pile of mail from strangers, which stays
+    unread, can never hide a receipt behind it."""
+    for start in range(0, len(uids), HEADERS_PER_FETCH):
+        batch = b",".join(uids[start : start + HEADERS_PER_FETCH])
+        _, parts = imap.uid("FETCH", batch, "(BODY.PEEK[HEADER.FIELDS (FROM AUTHENTICATION-RESULTS)])")
+        for part in parts:
+            if isinstance(part, tuple) and (found := re.search(rb"UID (\d+)", part[0])):
+                yield found[1], part[1]
+
+
 def _collect(db: Session) -> dict:
     settings = get_settings()
     counts = {"added": 0, "duplicate": 0, "ignored": 0, "failed": 0}
@@ -319,7 +354,13 @@ def _collect(db: Session) -> dict:
         imap.login(settings.receipts_imap_user, settings.receipts_imap_password.get_secret_value())
         imap.select("INBOX")
         _, found = imap.uid("SEARCH", None, "UNSEEN")
-        for uid in found[0].split()[:MAX_PER_CHECK]:
+        wanted = []
+        for uid, headers in _sender_headers(imap, found[0].split()):
+            if _profile_for(db, email.message_from_bytes(headers, policy=policy.default)) is None:
+                counts["ignored"] += 1
+            else:
+                wanted.append(uid)
+        for uid in wanted[:MAX_PER_CHECK]:
             # PEEK: fetching doesn't mark it as read. Only what was filed is marked.
             _, parts = imap.uid("FETCH", uid, "(BODY.PEEK[])")
             raw = next(part[1] for part in parts if isinstance(part, tuple))
@@ -331,7 +372,7 @@ def _collect(db: Session) -> dict:
                 counts["failed"] += 1
                 continue
             counts[outcome] += 1
-            # Ignored mail stays unread too: it's filed once its sender's address is added to a profile.
+            # Ignored mail stays unread: it's filed once its sender's address is added to a profile.
             if outcome != "ignored":
                 imap.uid("STORE", uid, "+FLAGS", "(\\Seen)")
     finally:

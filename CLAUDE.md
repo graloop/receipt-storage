@@ -185,8 +185,13 @@ itself, by the next day at the latest. No Claude session is involved.
   password (`RECEIPTS_IMAP_USER`, `RECEIPTS_IMAP_PASSWORD`: `.env` locally, the Portainer stack's
   environment variables on the server). The connection goes out from the server; nothing is
   opened to the internet. A "Check the mailbox now" button in Settings is there for trying it out.
-- A profile gets an email address. A forward goes to the profile whose address sent it. Mail
-  from any other address is ignored, so a stranger can't add receipts.
+- A profile gets an email address. A forward goes to the profile whose address sent it, only
+  when Gmail's own check proves that address (`dmarc=pass` in the top Authentication-Results
+  header). Mail from any other address, or unproven, is ignored and left unread, so a stranger
+  can't add receipts. The app reads only the sender lines of unread mail first and opens just
+  the emails from profiles, so ignored mail can never pile up in front of a receipt.
+- Attached files are kept. A picture placed inside the email is kept when it's photo-sized
+  (300 KB+), or 20 KB+ in an email whose text has no amounts; smaller ones are logos.
 - The email's text and any PDF or image attachments are saved and viewable in the detail view,
   waiting to be read like a photo (see "Reading receipts"). The forwarded email's original date
   is the purchase date until the receipt is read.

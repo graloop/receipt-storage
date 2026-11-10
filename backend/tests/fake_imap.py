@@ -2,9 +2,11 @@
 # socket, so the app's actual imaplib commands are exercised. It holds fake
 # emails and remembers which were marked as read.
 
+import email
 import re
 import socketserver
 import threading
+from email import policy
 
 
 class FakeMailbox:
@@ -14,6 +16,8 @@ class FakeMailbox:
         self.seen = set()
         self.deleted = False
         self.logins = []
+        self.header_fetches = 0
+        self.body_fetches = 0
 
     def add(self, raw: bytes) -> int:
         uid = len(self.messages) + 1
@@ -50,7 +54,21 @@ class _Handler(socketserver.StreamRequestHandler):
             elif command.startswith("UID SEARCH UNSEEN"):
                 self._send("* SEARCH " + " ".join(str(uid) for uid in box.unseen()))
                 self._send(f"{tag} OK done")
+            elif command.startswith("UID FETCH") and "HEADER.FIELDS" in command:
+                box.header_fetches += 1
+                fields = re.search(r"HEADER\.FIELDS \(([^)]*)\)", command)[1].split()
+                for uid in (int(u) for u in rest.split()[2].split(",")):
+                    message = email.message_from_bytes(box.messages[uid], policy=policy.compat32)
+                    lines = [f"{name}: {value}" for name, value in message.items() if name.upper() in fields]
+                    headers = ("\r\n".join(lines) + "\r\n\r\n").encode()
+                    self.wfile.write(
+                        f"* {uid} FETCH (UID {uid} BODY[HEADER.FIELDS ({' '.join(fields)})] {{{len(headers)}}}\r\n".encode()
+                        + headers
+                        + b")\r\n"
+                    )
+                self._send(f"{tag} OK done")
             elif command.startswith("UID FETCH"):
+                box.body_fetches += 1
                 uid = int(rest.split()[2])
                 # Asking for anything but PEEK would mark the mail as read, as Gmail does.
                 assert "BODY.PEEK[]" in command

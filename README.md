@@ -40,7 +40,8 @@ Forwarded email isn't needed for a first test. For it, see step 3.
    that, the app checks by itself once a day.
 
 Mail from an address that isn't on a profile is ignored and left unread, and it's filed at a
-later check if that address is added to a profile.
+later check if that address is added to a profile. Forward from an address whose provider proves
+its senders (Gmail, Outlook and iCloud all do); mail Gmail can't verify is ignored the same way.
 
 ### Reading receipts
 

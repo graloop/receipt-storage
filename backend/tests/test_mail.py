@@ -16,6 +16,7 @@ from .conftest import make_extracted, png
 from .fake_imap import FakeImapServer, FakeMailbox
 
 SENDER = "alex@example.com"
+MAIL_PILE = 750  # More than the 200 opened per check and the 500 senders asked for at once.
 PDF = b"%PDF-1.4 fake invoice"
 
 
@@ -27,7 +28,7 @@ def forward(
     date_header="Sat, 01 Nov 2026 10:00:00 -0400",
     html=None,
     attachments=(),
-    auth=None,
+    auth="mx.google.com; dkim=pass header.i=@example.com; spf=pass; dmarc=pass (p=NONE) header.from=example.com",
 ) -> bytes:
     message = EmailMessage()
     message["From"] = f"Alex <{sender}>"
@@ -185,6 +186,7 @@ def test_a_forward_as_attachment_is_opened(client, box, alex):
     outer["From"] = SENDER
     outer["Subject"] = "Fwd"
     outer["Message-ID"] = "<outer@example.com>"
+    outer["Authentication-Results"] = "mx.google.com; dmarc=pass header.from=example.com"
     outer.set_content("See attached email")
     outer.add_attachment(inner)
     box.add(outer.as_bytes())
@@ -278,14 +280,54 @@ def test_plain_text_is_preferred_over_html(client, box, alex):
     assert "html words" not in receipts(client)[0]["raw_text"]
 
 
-def test_a_logo_inside_the_email_is_not_a_receipt(client, box, alex):
+def picture(size_bytes: int) -> bytes:
+    """A PNG of about this many bytes (noise doesn't compress)."""
+    import io
+    import os
+
+    from PIL import Image
+
+    side = int((size_bytes / 3) ** 0.5) + 1
+    out = io.BytesIO()
+    Image.frombytes("RGB", (side, side), os.urandom(side * side * 3)).save(out, format="PNG")
+    return out.getvalue()
+
+
+def email_with_inline(text: str, image: bytes, html_text: str | None = None) -> bytes:
     message = EmailMessage()
     message["From"] = SENDER
-    message["Message-ID"] = "<logo@example.com>"
-    message.set_content("Text")
-    message.add_alternative("<p>Text<img src='cid:logo'></p>", subtype="html")
-    message.get_payload()[1].add_related(png(), maintype="image", subtype="png", cid="<logo>")
-    box.add(message.as_bytes())
+    message["Message-ID"] = f"<inline-{len(image)}-{len(text)}@x>"
+    message["Authentication-Results"] = "mx.google.com; dmarc=pass header.from=example.com"
+    message.set_content(text)
+    message.add_alternative(f"<p>{html_text or text}<img src='cid:pic'></p>", subtype="html")
+    message.get_payload()[1].add_related(image, maintype="image", subtype="png", cid="<pic>")
+    return message.as_bytes()
+
+
+def test_a_photo_placed_inside_the_email_is_kept(client, box, alex):
+    photo = picture(60_000)
+    box.add(email_with_inline("Sent from my phone", photo))
+    check(client)
+    receipt = receipts(client)[0]
+    assert receipt["file_type"] == "image"
+    assert client.get(f"/api/receipts/{receipt['id']}/image").content == photo
+
+
+def test_a_photo_sized_picture_is_kept_even_in_an_email_with_amounts(client, box, alex):
+    box.add(email_with_inline("Dinner, total $45.00", picture(400_000)))
+    check(client)
+    assert receipts(client)[0]["file_type"] == "image"
+
+
+def test_a_shops_pictures_are_not_receipts(client, box, alex):
+    # A shop's email: amounts in the text, a product picture inside it.
+    box.add(email_with_inline("Order Total $129.99", picture(60_000)))
+    check(client)
+    assert [r["file_type"] for r in receipts(client)] == [None]
+
+
+def test_a_tiny_picture_like_a_logo_is_not_a_receipt(client, box, alex):
+    box.add(email_with_inline("No amounts here", picture(3_000)))
     check(client)
     assert [r["file_type"] for r in receipts(client)] == [None]
 
@@ -321,6 +363,23 @@ def test_a_forged_sender_is_ignored(client, box, alex):
     assert receipts(client) == []
 
 
+def test_no_verdict_at_all_is_not_proof(client, box, alex):
+    box.add(forward(auth=None))
+    assert check(client)["ignored"] == 1
+    assert receipts(client) == []
+
+
+def test_a_pass_written_lower_down_by_the_sender_is_not_trusted(client, box, alex):
+    message = EmailMessage()
+    message["Authentication-Results"] = "mx.google.com; dmarc=fail header.from=example.com"
+    message["Authentication-Results"] = "mx.google.com; dmarc=pass header.from=example.com"  # Forged, below Gmail's.
+    message["From"] = SENDER
+    message["Message-ID"] = "<forged@x>"
+    message.set_content("text")
+    box.add(message.as_bytes())
+    assert check(client)["ignored"] == 1
+
+
 def test_an_honest_verdict_passes(client, box, alex):
     box.add(forward(auth="mx.google.com; dkim=pass; dmarc=pass header.from=example.com"))
     assert check(client)["added"] == 1
@@ -353,6 +412,23 @@ def test_an_attachment_already_uploaded_as_a_photo_is_a_duplicate(client, box, a
     )
     box.add(forward("Same photo", attachments=[("a.png", png(), "image", "png")]))
     assert check(client)["duplicate"] == 1
+    assert len(receipts(client)) == 1
+
+
+def test_a_pile_of_mail_from_strangers_never_hides_a_receipt(client, box, alex):
+    for i in range(MAIL_PILE):
+        box.add(forward(sender=f"stranger{i}@example.com", message_id=f"<s{i}@x>"))
+    box.add(forward("The real receipt", message_id="<real@x>"))
+    result = check(client)
+    assert (result["added"], result["ignored"]) == (1, MAIL_PILE)
+    assert "The real receipt" in receipts(client)[0]["raw_text"]
+    assert box.body_fetches == 1  # Strangers' emails were never downloaded.
+    assert len(box.unseen()) == MAIL_PILE  # And they stay unread, in case a profile gets their address.
+
+
+def test_the_same_file_twice_in_one_email_is_kept_once_and_the_email_filed(client, box, alex):
+    box.add(forward("Twice", attachments=[("a.pdf", PDF, "application", "pdf"), ("copy.pdf", PDF, "application", "pdf")]))
+    assert check(client)["added"] == 1
     assert len(receipts(client)) == 1
 
 
